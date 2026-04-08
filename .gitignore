@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets
+.env
+
+# Runtime outputs (generated)
+logs/
+exports/
+uploads/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Case-study source / instruction files (keep out of git)
+*.xlsx
+*.xls
+*.docx
+*.pdf
+
+# If you keep the spec locally only
+ins.md
