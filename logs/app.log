@@ -1,0 +1,183 @@
+2026-04-08 14:17:42,174 INFO werkzeug - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-04-08 14:17:42,174 INFO werkzeug - [33mPress CTRL+C to quit[0m
+2026-04-08 14:17:42,174 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:17:42,502 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:17:42,508 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:24:22,808 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:22] "GET / HTTP/1.1" 200 -
+2026-04-08 14:24:22,831 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:22] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-04-08 14:24:26,468 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:26] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 14:24:27,868 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:27] "GET / HTTP/1.1" 200 -
+2026-04-08 14:24:28,862 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:28] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:24:31,057 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:24:31] "GET / HTTP/1.1" 200 -
+2026-04-08 14:25:21,399 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:25:21] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:25:45,903 INFO etl.pipeline - Starting ETL run_id=4eb02ffc0988 source=uploads/20260408_182545__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:25:46,030 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:25:46,031 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:25:46,033 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:25:46,099 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:25:46,186 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:25:46,194 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:25:46,365 INFO etl.pipeline - Finished ETL run_id=4eb02ffc0988
+2026-04-08 14:25:46,366 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:25:46] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:25:46,372 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:25:46] "GET /etl/4eb02ffc0988 HTTP/1.1" 200 -
+2026-04-08 14:29:34,791 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/extract.py', reloading
+2026-04-08 14:29:34,909 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:29:35,433 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:29:35,438 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:29:43,539 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/clean.py', reloading
+2026-04-08 14:29:43,651 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:29:44,012 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:29:44,017 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:30:05,234 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/dq.py', reloading
+2026-04-08 14:30:05,326 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:30:05,826 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:30:05,831 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:30:18,973 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/load.py', reloading
+2026-04-08 14:30:19,083 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:30:19,451 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:30:19,456 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:30:35,642 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/curate.py', reloading
+2026-04-08 14:30:35,745 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:30:36,231 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:30:36,237 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:31:17,928 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:17] "GET /etl/4eb02ffc0988 HTTP/1.1" 200 -
+2026-04-08 14:31:22,176 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:22] "GET / HTTP/1.1" 200 -
+2026-04-08 14:31:23,652 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:23] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:31:25,252 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:25] "GET / HTTP/1.1" 200 -
+2026-04-08 14:31:44,290 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:44] "GET / HTTP/1.1" 200 -
+2026-04-08 14:31:45,841 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:31:45] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:32:00,507 INFO etl.pipeline - Starting ETL run_id=bd3b1651b219 source=uploads/20260408_183200__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:32:00,596 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:32:00,597 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:32:00,599 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:32:00,665 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:32:00,752 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:32:00,761 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:32:00,785 ERROR routes.pages - ETL failed
+Traceback (most recent call last):
+  File "/Users/selma/Desktop/mercedes/routes/pages.py", line 46, in upload_and_run
+    result = run_pipeline(source_path=path)
+  File "/Users/selma/Desktop/mercedes/etl/pipeline.py", line 42, in run_pipeline
+    curated = build_curated(clean)
+  File "/Users/selma/Desktop/mercedes/etl/steps/curate.py", line 23, in build_curated
+    curated["dealer_performance_summary"] = _dealer_perf(sales, dealers)
+                                            ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Users/selma/Desktop/mercedes/etl/steps/curate.py", line 70, in _dealer_perf
+    out = out.merge(dealers[join_cols].drop_duplicates("dealer_id"), on="dealer_id", how="left")
+  File "/Users/selma/Desktop/mercedes/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 12888, in merge
+    return merge(
+        self,
+    ...<10 lines>...
+        validate=validate,
+    )
+  File "/Users/selma/Desktop/mercedes/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 385, in merge
+    op = _MergeOperation(
+        left_df,
+    ...<10 lines>...
+        validate=validate,
+    )
+  File "/Users/selma/Desktop/mercedes/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 1031, in __init__
+    self._maybe_coerce_merge_keys()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/selma/Desktop/mercedes/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 1835, in _maybe_coerce_merge_keys
+    raise ValueError(msg)
+ValueError: You are trying to merge on string and int64 columns for key 'dealer_id'. If you wish to proceed you should use pd.concat
+2026-04-08 14:32:00,790 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:32:00] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:32:00,793 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:32:00] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:32:14,997 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:32:14] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+2026-04-08 14:32:36,093 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/clean.py', reloading
+2026-04-08 14:32:36,218 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:32:36,705 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:32:36,711 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:32:41,777 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/curate.py', reloading
+2026-04-08 14:32:41,891 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:32:42,259 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:32:42,263 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:33:05,226 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:05] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:33:15,641 INFO etl.pipeline - Starting ETL run_id=1706f712d7c9 source=uploads/20260408_183315__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:33:15,728 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:33:15,728 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:33:15,731 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:33:15,800 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:33:15,888 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:33:15,897 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:33:16,119 INFO etl.pipeline - Finished ETL run_id=1706f712d7c9
+2026-04-08 14:33:16,120 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:16] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:33:16,126 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:16] "GET /etl/1706f712d7c9 HTTP/1.1" 200 -
+2026-04-08 14:33:28,909 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:28] "GET / HTTP/1.1" 200 -
+2026-04-08 14:33:30,496 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:30] "GET /etl/1706f712d7c9 HTTP/1.1" 200 -
+2026-04-08 14:33:35,610 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:35] "GET / HTTP/1.1" 200 -
+2026-04-08 14:33:36,818 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:33:36] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 14:35:42,391 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:35:42,478 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:35:42,910 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:35:42,917 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:35:48,000 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:35:48,115 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:35:48,527 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:35:48,532 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:36:09,181 ERROR app - Exception on /dashboards [GET]
+Traceback (most recent call last):
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/app.py", line 1455, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/app.py", line 869, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/selma/Desktop/mercedes/routes/pages.py", line 76, in dashboards
+    return render_template(
+        "dashboards.html",
+    ...<4 lines>...
+        has_sales=df is not None and not df.empty,
+    )
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/templating.py", line 152, in render_template
+    return _render(app, template, context)
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/templating.py", line 133, in _render
+    rv = template.render(context)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "/Users/selma/Desktop/mercedes/templates/dashboards.html", line 221, in top-level template code
+    render("plot-daily_total", {{ figures.daily_total | tojson }});
+    ^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/jinja2/filters.py", line 1726, in do_tojson
+    return htmlsafe_json_dumps(value, dumps=dumps, **kwargs)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/jinja2/utils.py", line 669, in htmlsafe_json_dumps
+    dumps(obj, **kwargs)
+    ~~~~~^^^^^^^^^^^^^^^
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/json/provider.py", line 180, in dumps
+    return json.dumps(obj, **kwargs)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 238, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/encoder.py", line 200, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/encoder.py", line 261, in iterencode
+    return _iterencode(o, 0)
+  File "/Users/selma/Library/Python/3.13/lib/python/site-packages/flask/json/provider.py", line 120, in _default
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+TypeError: Object of type ndarray is not JSON serializable
+2026-04-08 14:36:11,817 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:36:11,936 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:36:12,437 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:36:12,442 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:36:14,483 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:36:14,594 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:36:14,992 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:36:14,996 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:36:16,015 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:36:16,108 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:36:16,517 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:36:16,521 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:36:17,544 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 14:36:17,644 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:36:18,050 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:36:18,055 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:36:35,158 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:36:35] "GET /dashboards HTTP/1.1" 200 -

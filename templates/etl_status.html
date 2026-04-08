@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ETL Status</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #fafafa; text-align: left; }
+      .ok { color: #0a7; }
+      .bad { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <h2>ETL Status</h2>
+
+    {% if latest %}
+      <div><b>run_id</b>: {{ latest.pipeline_run_id }}</div>
+      <div><b>timestamp</b>: {{ latest.run_timestamp_utc }}</div>
+      <div><b>source</b>: {{ latest.source_file_name }}</div>
+
+      <h3 style="margin-top: 16px;">Tables</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>layer</th>
+            <th>table</th>
+            <th>raw_rows</th>
+            <th>clean_rows</th>
+            <th>inserted</th>
+            <th>status</th>
+            <th>error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in latest.tables %}
+            <tr>
+              <td>{{ t.layer }}</td>
+              <td>{{ t.table_name }}</td>
+              <td>{{ t.raw_row_count }}</td>
+              <td>{{ t.clean_row_count }}</td>
+              <td>{{ t.inserted_count }}</td>
+              <td class="{{ 'ok' if t.status == 'success' else 'bad' }}">{{ t.status }}</td>
+              <td>{{ t.error_message or '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div>Run not found.</div>
+    {% endif %}
+
+    <div style="margin-top: 14px;">
+      <a href="{{ url_for('pages.home') }}">Back</a>
+    </div>
+  </body>
+</html>
+

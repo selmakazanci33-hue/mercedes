@@ -1,0 +1,7 @@
+pipeline_run_id,table_name,quality_score,critical_issue_count,medium_issue_count,low_issue_count,notes
+1706f712d7c9,dealers,100.0,0,0,0,
+1706f712d7c9,models,90.0,1,0,0,
+1706f712d7c9,inventory,100.0,0,0,0,
+1706f712d7c9,sales,100.0,0,0,0,
+1706f712d7c9,interest_rates,68.0,2,2,0,
+1706f712d7c9,forecast_assumptions,100.0,0,0,0,

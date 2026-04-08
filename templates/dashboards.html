@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Executive dashboard — revenue</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+    <style>
+      :root {
+        --border: #e2e2e2;
+        --bg: #fafafa;
+        --accent: #1a5f4a;
+      }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: #1a1a1a;
+      }
+      header {
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
+      }
+      header h1 {
+        margin: 0 0 4px 0;
+        font-size: 1.25rem;
+        font-weight: 650;
+      }
+      header p {
+        margin: 0;
+        font-size: 0.875rem;
+        color: #555;
+      }
+      .nav {
+        margin-top: 10px;
+      }
+      .nav a {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.9rem;
+      }
+      .nav a:hover {
+        text-decoration: underline;
+      }
+      .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+        padding: 20px 24px 0;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .kpi {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .kpi .label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #666;
+        margin-bottom: 6px;
+      }
+      .kpi .value {
+        font-size: 1.35rem;
+        font-weight: 650;
+        color: #111;
+      }
+      .grid {
+        display: grid;
+        gap: 20px;
+        padding: 20px 24px 40px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .chart-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 12px 4px;
+        min-height: 380px;
+      }
+      .chart-card h2 {
+        margin: 0 0 8px 12px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #333;
+      }
+      .plot {
+        width: 100%;
+        min-height: 340px;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      @media (min-width: 1100px) {
+        .two-col.side-by-side {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .banner {
+        margin: 12px 24px 0;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 10px 14px;
+        background: #eef6f3;
+        border: 1px solid #c5ddd4;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        color: #2c4a40;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Revenue analytics (interactive)</h1>
+      <p>
+        Figures use the same data as SQLite: <code>clean_sales</code> joined to <code>clean_dealers</code>
+        (source: {{ data_source }}).
+      </p>
+      <div class="nav">
+        <a href="{{ url_for('pages.home') }}">← Home</a>
+        ·
+        <a href="{{ url_for('pages.upload_and_run') }}">Upload &amp; ETL</a>
+      </div>
+    </header>
+
+    {% if not has_sales %}
+    <div class="banner">
+      No sales rows loaded yet. Run ETL with your Excel file, then refresh this page.
+    </div>
+    {% endif %}
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="label">Total revenue</div>
+        <div class="value">${{ "{:,.0f}".format(kpis.total_revenue) }}</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Sales rows</div>
+        <div class="value">{{ "{:,}".format(kpis.sale_count) }}</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Date range</div>
+        <div class="value" style="font-size: 0.95rem">
+          {% if kpis.date_min and kpis.date_max %}
+          {{ kpis.date_min }} → {{ kpis.date_max }}
+          {% else %}
+          —
+          {% endif %}
+        </div>
+      </div>
+      <div class="kpi">
+        <div class="label">Dealers</div>
+        <div class="value">{{ kpis.dealer_count }}</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Regions</div>
+        <div class="value">{{ kpis.region_count }}</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="chart-card">
+        <h2>Daily — total revenue</h2>
+        <div id="plot-daily_total" class="plot"></div>
+      </section>
+
+      <div class="two-col side-by-side">
+        <section class="chart-card">
+          <h2>Daily — by region</h2>
+          <div id="plot-daily_by_region" class="plot"></div>
+        </section>
+        <section class="chart-card">
+          <h2>Daily — top dealers</h2>
+          <div id="plot-daily_by_dealer" class="plot"></div>
+        </section>
+      </div>
+
+      <section class="chart-card">
+        <h2>Monthly — total revenue</h2>
+        <div id="plot-monthly_total" class="plot"></div>
+      </section>
+
+      <div class="two-col side-by-side">
+        <section class="chart-card">
+          <h2>Monthly — by region</h2>
+          <div id="plot-monthly_by_region" class="plot"></div>
+        </section>
+        <section class="chart-card">
+          <h2>Monthly — top dealers</h2>
+          <div id="plot-monthly_by_dealer" class="plot"></div>
+        </section>
+      </div>
+
+      {% if dq_fig %}
+      <section class="chart-card">
+        <h2>Data quality (SQLite: dq_issues)</h2>
+        <div id="plot-dq" class="plot" style="min-height: 300px"></div>
+      </section>
+      {% endif %}
+    </div>
+
+    <script>
+      (function () {
+        var layoutBase = { autosize: true, margin: { l: 50, r: 20, t: 40, b: 50 } };
+        var config = { responsive: true, displayModeBar: true, displaylogo: false };
+
+        function render(id, spec) {
+          if (!spec || !spec.data) return;
+          var lay = Object.assign({}, layoutBase, spec.layout || {});
+          Plotly.newPlot(id, spec.data, lay, config);
+        }
+
+        render("plot-daily_total", {{ figures.daily_total | tojson }});
+        render("plot-daily_by_region", {{ figures.daily_by_region | tojson }});
+        render("plot-daily_by_dealer", {{ figures.daily_by_dealer | tojson }});
+        render("plot-monthly_total", {{ figures.monthly_total | tojson }});
+        render("plot-monthly_by_region", {{ figures.monthly_by_region | tojson }});
+        render("plot-monthly_by_dealer", {{ figures.monthly_by_dealer | tojson }});
+        {% if dq_fig %}
+        render("plot-dq", {{ dq_fig | tojson }});
+        {% endif %}
+
+        window.addEventListener("resize", function () {
+          document.querySelectorAll('[id^="plot-"]').forEach(function (el) {
+            if (el && el.id) Plotly.Plots.resize(el);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

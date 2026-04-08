@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Upload & Run ETL</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; max-width: 980px; }
+      .flash { margin: 8px 0; padding: 10px; border-radius: 10px; }
+      .flash.success { background: #e8fff2; border: 1px solid #b7f0cf; }
+      .flash.error { background: #fff1f1; border: 1px solid #f2bcbc; }
+    </style>
+  </head>
+  <body>
+    <h2>Upload & Run ETL</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{category}}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="card">
+      <form method="post" enctype="multipart/form-data">
+        <div>
+          <input type="file" name="file" accept=".xlsx" required />
+        </div>
+        <div style="margin-top: 12px;">
+          <button type="submit">Upload and run pipeline</button>
+        </div>
+      </form>
+      <div style="margin-top: 12px;">
+        <a href="{{ url_for('pages.home') }}">Back</a>
+      </div>
+    </div>
+  </body>
+</html>
+
