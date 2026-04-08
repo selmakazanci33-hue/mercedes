@@ -115,6 +115,51 @@
         font-size: 0.85rem;
         color: #2c4a40;
       }
+      .dealer-table-section {
+        max-width: 1400px;
+        margin: 0 auto 8px;
+        padding: 0 24px;
+      }
+      .dealer-table-section h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0 0 10px 0;
+        color: #333;
+      }
+      .dealer-table-wrap {
+        overflow-x: auto;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0;
+        max-height: 420px;
+        overflow-y: auto;
+      }
+      .dealer-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+      .dealer-table th,
+      .dealer-table td {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+      }
+      .dealer-table th {
+        position: sticky;
+        top: 0;
+        background: #f5f5f5;
+        font-weight: 600;
+        z-index: 1;
+      }
+      .dealer-table tbody tr:hover {
+        background: #f9fbfa;
+      }
+      .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
     </style>
   </head>
   <body>
@@ -166,6 +211,45 @@
       </div>
     </div>
 
+    {% if has_sales and dealer_rows %}
+    <div class="banner" style="margin-top: 16px">
+      Dealer charts (daily/monthly by dealer) include <strong>every dealer with sales</strong> by default.
+      To focus on the largest dealers only, add <code>?top=10</code> to the URL (example:
+      <code>/dashboards?top=10</code>).
+      {% if dealer_chart_limited %}
+      You are viewing a <strong>limited</strong> chart set; the table below still lists <strong>all</strong> dealers.
+      {% endif %}
+    </div>
+
+    <div class="dealer-table-section">
+      <h2>All dealers (same SQLite join: sales + dealer name + region)</h2>
+      <div class="dealer-table-wrap">
+        <table class="dealer-table">
+          <thead>
+            <tr>
+              <th>Dealer ID</th>
+              <th>Dealer name</th>
+              <th>Region</th>
+              <th class="num">Sales</th>
+              <th class="num">Total revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in dealer_rows %}
+            <tr>
+              <td>{{ row.dealer_id }}</td>
+              <td>{{ row.dealer_name }}</td>
+              <td>{{ row.region }}</td>
+              <td class="num">{{ "{:,}".format(row.sale_count) }}</td>
+              <td class="num">${{ "{:,.0f}".format(row.total_revenue) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="grid">
       <section class="chart-card">
         <h2>Daily — total revenue</h2>
@@ -178,7 +262,7 @@
           <div id="plot-daily_by_region" class="plot"></div>
         </section>
         <section class="chart-card">
-          <h2>Daily — top dealers</h2>
+          <h2>Daily — by dealer</h2>
           <div id="plot-daily_by_dealer" class="plot"></div>
         </section>
       </div>
@@ -194,7 +278,7 @@
           <div id="plot-monthly_by_region" class="plot"></div>
         </section>
         <section class="chart-card">
-          <h2>Monthly — top dealers</h2>
+          <h2>Monthly — by dealer</h2>
           <div id="plot-monthly_by_dealer" class="plot"></div>
         </section>
       </div>

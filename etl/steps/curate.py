@@ -23,7 +23,7 @@ def build_curated(clean: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         curated["dealer_performance_summary"] = _dealer_perf(sales, dealers)
         curated["model_performance_summary"] = _model_perf(sales, models)
         curated["pricing_variance_summary"] = _pricing_variance(sales)
-        curated["regional_performance_summary"] = _regional_perf(sales)
+        curated["regional_performance_summary"] = _regional_perf(sales, dealers)
 
     if inventory is not None and sales is not None:
         curated["inventory_vs_sales_summary"] = _inventory_vs_sales(inventory, sales, dealers, models)
@@ -108,14 +108,34 @@ def _pricing_variance(sales: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values(["p90_minus_p10"], ascending=False)
 
 
-def _regional_perf(sales: pd.DataFrame) -> pd.DataFrame:
-    if "region" not in sales.columns:
-        return pd.DataFrame()
-    grp = sales.groupby(["region"], dropna=False)
+def _regional_perf(sales: pd.DataFrame, dealers: pd.DataFrame | None) -> pd.DataFrame:
+    """
+    Region is on Dealers, not Sales — join dealers to attribute each sale to a region.
+    """
+    cols_out = ["region", "sales_count", "total_revenue", "avg_sale_price"]
+    s = sales.copy()
+    if "dealer_id" not in s.columns:
+        return pd.DataFrame(columns=cols_out)
+
+    s["dealer_id"] = s["dealer_id"].astype("string").str.strip()
+    if "region" not in s.columns and dealers is not None and "dealer_id" in dealers.columns and "region" in dealers.columns:
+        d = dealers.copy()
+        d["dealer_id"] = d["dealer_id"].astype("string").str.strip()
+        s = s.merge(d[["dealer_id", "region"]].drop_duplicates("dealer_id"), on="dealer_id", how="left")
+
+    if "region" not in s.columns:
+        return pd.DataFrame(columns=cols_out)
+
+    s["region"] = s["region"].astype("string").str.upper().str.strip()
+    s = s.dropna(subset=["region"])
+    if s.empty:
+        return pd.DataFrame(columns=cols_out)
+
+    grp = s.groupby(["region"], dropna=False)
     out = grp.agg(
-        sales_count=("sale_id", "count") if "sale_id" in sales.columns else ("region", "count"),
-        total_revenue=("sale_price", "sum") if "sale_price" in sales.columns else ("region", "size"),
-        avg_sale_price=("sale_price", "mean") if "sale_price" in sales.columns else ("region", "size"),
+        sales_count=("sale_id", "count") if "sale_id" in s.columns else ("region", "count"),
+        total_revenue=("sale_price", "sum") if "sale_price" in s.columns else ("region", "size"),
+        avg_sale_price=("sale_price", "mean") if "sale_price" in s.columns else ("region", "size"),
     ).reset_index()
     return out.sort_values(["total_revenue"], ascending=False)
 

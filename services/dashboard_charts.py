@@ -34,7 +34,11 @@ def _empty_fig(title: str, message: str) -> go.Figure:
     return fig
 
 
-def build_dashboard_figures(enriched: EnrichedSales | None, top_n_dealers: int = 10) -> dict[str, Any]:
+def build_dashboard_figures(
+    enriched: EnrichedSales | None,
+    *,
+    top_n_dealers: int | None = None,
+) -> dict[str, Any]:
     """
     Build Plotly figure dicts (plotly JSON-compatible) for the executive dashboard.
     All series derive from the same enriched DataFrame as SQLite (post-join).
@@ -96,20 +100,14 @@ def build_dashboard_figures(enriched: EnrichedSales | None, top_n_dealers: int =
         )
 
     dealer_label = "dealer_name" if "dealer_name" in df.columns and df["dealer_name"].notna().any() else "dealer_id"
-    top_dealers = (
-        df.groupby(dealer_label, as_index=False)["revenue"]
-        .sum()
-        .nlargest(top_n_dealers, "revenue")[dealer_label]
-        .tolist()
-    )
-    sub = df[df[dealer_label].isin(top_dealers)]
+    sub, dealer_chart_title = _dealer_subset_for_charts(df, dealer_label, top_n_dealers)
     daily_d = sub.groupby(["day", dealer_label], as_index=False)["revenue"].sum()
     fig_dd = px.line(
         daily_d,
         x="day",
         y="revenue",
         color=dealer_label,
-        title=f"Daily revenue — top {top_n_dealers} dealers by total revenue",
+        title=f"Daily revenue — {dealer_chart_title}",
         labels={"revenue": "Revenue", "day": "Date", dealer_label: "Dealer"},
         color_discrete_sequence=_COLOR_SEQUENCE,
     )
@@ -151,7 +149,7 @@ def build_dashboard_figures(enriched: EnrichedSales | None, top_n_dealers: int =
         x="month_period",
         y="revenue",
         color=dealer_label,
-        title=f"Monthly revenue — top {top_n_dealers} dealers",
+        title=f"Monthly revenue — {dealer_chart_title}",
         labels={"revenue": "Revenue", "month_period": "Month"},
         barmode="group",
         color_discrete_sequence=_COLOR_SEQUENCE,
@@ -160,6 +158,63 @@ def build_dashboard_figures(enriched: EnrichedSales | None, top_n_dealers: int =
     out["monthly_by_dealer"] = _fig_to_safe_dict(fig_md)
 
     return out
+
+
+def _dealer_subset_for_charts(
+    df: pd.DataFrame,
+    dealer_label: str,
+    top_n_dealers: int | None,
+) -> tuple[pd.DataFrame, str]:
+    """
+    By default include every dealer with sales (same SQLite data as the rest of the page).
+    Optional top_n_dealers limits to the largest dealers by total revenue for readability.
+    """
+    by_dealer = df.groupby(dealer_label, as_index=False)["revenue"].sum()
+    n_dealers = len(by_dealer)
+    if top_n_dealers is None or top_n_dealers <= 0 or top_n_dealers >= n_dealers:
+        return df, f"all dealers ({n_dealers})"
+    top_ids = by_dealer.nlargest(top_n_dealers, "revenue")[dealer_label].tolist()
+    sub = df[df[dealer_label].isin(top_ids)]
+    return sub, f"top {top_n_dealers} dealers by total revenue (of {n_dealers})"
+
+
+def build_dealer_summary_table(df: pd.DataFrame | None) -> list[dict[str, Any]]:
+    """
+    One row per dealer: id, name, region, total revenue, sale count — full roster from SQLite-enriched sales.
+    """
+    if df is None or df.empty or "dealer_id" not in df.columns:
+        return []
+    d = df.copy()
+    d["revenue"] = pd.to_numeric(d["sale_price"], errors="coerce")
+    agg_dict: dict[str, Any] = {
+        "total_revenue": ("revenue", "sum"),
+        "sale_count": ("sale_id", "count") if "sale_id" in d.columns else ("revenue", "count"),
+    }
+    if "dealer_name" in d.columns:
+        agg_dict["dealer_name"] = ("dealer_name", "first")
+    if "region" in d.columns:
+        agg_dict["region"] = ("region", "first")
+
+    g = d.groupby("dealer_id", dropna=False).agg(**agg_dict).reset_index()
+    g = g.sort_values("total_revenue", ascending=False)
+    rows: list[dict[str, Any]] = []
+    for _, r in g.iterrows():
+        name = "—"
+        if "dealer_name" in g.columns and pd.notna(r["dealer_name"]):
+            name = str(r["dealer_name"])
+        reg = "—"
+        if "region" in g.columns and pd.notna(r["region"]):
+            reg = str(r["region"])
+        rows.append(
+            {
+                "dealer_id": str(r["dealer_id"]),
+                "dealer_name": name,
+                "region": reg,
+                "total_revenue": float(r["total_revenue"]),
+                "sale_count": int(r["sale_count"]),
+            }
+        )
+    return rows
 
 
 def build_dq_figure(dq_df: pd.DataFrame | None) -> dict[str, Any] | None:

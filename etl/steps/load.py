@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 import pandas as pd
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from models.audit import EtlAuditLog
 from models.dq import DqIssue, DqTableScore
+
+logger = logging.getLogger(__name__)
 
 
 def load_all_layers(
@@ -72,9 +75,16 @@ def _load_layer_tables(
 def _replace_table(session: Session, table_name: str, df: pd.DataFrame) -> int:
     """
     Default: replace entire table (safe baseline for dimension/snapshot tables).
+    SQLite/pandas cannot CREATE TABLE with zero columns; normalize empty schema.
     """
     if df is None:
         df = pd.DataFrame()
+    if df.shape[1] == 0:
+        logger.warning(
+            "Skipping SQLite write for %s: DataFrame has no columns (use empty table with schema in curate).",
+            table_name,
+        )
+        return 0
     df.to_sql(table_name, session.get_bind(), if_exists="replace", index=False)
     return int(len(df))
 
@@ -86,7 +96,8 @@ def _upsert_sales_by_sale_id(session: Session, table_name: str, df: pd.DataFrame
     - If it exists, append only sale_id values not already present.
     """
     if df is None or df.empty:
-        _replace_table(session, table_name, pd.DataFrame(columns=df.columns if df is not None else []))
+        if df is not None and len(df.columns) > 0:
+            _replace_table(session, table_name, df)
         return 0
 
     if "sale_id" not in df.columns:

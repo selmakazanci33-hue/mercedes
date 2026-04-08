@@ -181,3 +181,114 @@ TypeError: Object of type ndarray is not JSON serializable
 2026-04-08 14:36:18,050 WARNING werkzeug -  * Debugger is active!
 2026-04-08 14:36:18,055 INFO werkzeug -  * Debugger PIN: 821-944-661
 2026-04-08 14:36:35,158 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:36:35] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 14:39:08,075 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:39:08] "GET / HTTP/1.1" 200 -
+2026-04-08 14:39:09,928 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:39:09] "GET /etl/1706f712d7c9 HTTP/1.1" 200 -
+2026-04-08 14:39:23,128 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:39:23] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:39:32,404 INFO etl.pipeline - Starting ETL run_id=ee9cb2925fa7 source=uploads/20260408_183932__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:39:32,491 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:39:32,491 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:39:32,494 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:39:32,562 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:39:32,647 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:39:32,655 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:39:32,875 INFO etl.pipeline - Finished ETL run_id=ee9cb2925fa7
+2026-04-08 14:39:32,876 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:39:32] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:39:32,880 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:39:32] "GET /etl/ee9cb2925fa7 HTTP/1.1" 200 -
+2026-04-08 14:40:34,971 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/curate.py', reloading
+2026-04-08 14:40:35,115 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:40:35,674 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:40:35,680 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:40:39,735 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/load.py', reloading
+2026-04-08 14:40:39,851 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:40:40,264 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:40:40,269 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:40:42,306 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/load.py', reloading
+2026-04-08 14:40:42,430 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:40:42,873 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:40:42,878 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:40:47,951 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/etl/steps/curate.py', reloading
+2026-04-08 14:40:48,047 INFO werkzeug -  * Restarting with stat
+2026-04-08 14:40:48,459 WARNING werkzeug -  * Debugger is active!
+2026-04-08 14:40:48,463 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 14:41:10,435 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:10] "GET /etl/ee9cb2925fa7 HTTP/1.1" 200 -
+2026-04-08 14:41:15,609 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:15] "GET / HTTP/1.1" 200 -
+2026-04-08 14:41:18,015 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:18] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:41:36,466 INFO etl.pipeline - Starting ETL run_id=d1ce20795f7a source=uploads/20260408_184136__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:41:36,541 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:41:36,542 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:41:36,544 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:41:36,613 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:41:36,720 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:41:36,728 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:41:36,940 INFO etl.pipeline - Finished ETL run_id=d1ce20795f7a
+2026-04-08 14:41:36,941 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:36] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:41:36,945 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:36] "GET /etl/d1ce20795f7a HTTP/1.1" 200 -
+2026-04-08 14:41:55,555 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:55] "GET / HTTP/1.1" 200 -
+2026-04-08 14:41:59,527 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:41:59] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 14:46:17,008 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:17] "GET / HTTP/1.1" 200 -
+2026-04-08 14:46:21,224 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:21] "GET /etl/d1ce20795f7a HTTP/1.1" 200 -
+2026-04-08 14:46:26,682 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:26] "GET / HTTP/1.1" 200 -
+2026-04-08 14:46:39,699 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:39] "GET /upload HTTP/1.1" 200 -
+2026-04-08 14:46:51,493 INFO etl.pipeline - Starting ETL run_id=fe7a51c0e493 source=uploads/20260408_184651__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 14:46:51,514 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 14:46:51,515 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 14:46:51,519 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 14:46:51,603 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 14:46:51,688 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 14:46:51,697 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 14:46:51,898 INFO etl.pipeline - Finished ETL run_id=fe7a51c0e493
+2026-04-08 14:46:51,899 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:51] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 14:46:51,903 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:46:51] "GET /etl/fe7a51c0e493 HTTP/1.1" 200 -
+2026-04-08 14:47:29,335 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:47:29] "GET / HTTP/1.1" 200 -
+2026-04-08 14:47:32,036 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 14:47:32] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 15:04:06,238 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:06] "GET / HTTP/1.1" 200 -
+2026-04-08 15:04:19,801 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:19] "GET /upload HTTP/1.1" 200 -
+2026-04-08 15:04:32,388 INFO etl.pipeline - Starting ETL run_id=521fc7553a51 source=uploads/20260408_190432__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 15:04:32,405 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 15:04:32,408 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 15:04:32,414 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 15:04:32,496 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 15:04:32,583 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 15:04:32,591 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 15:04:32,796 INFO etl.pipeline - Finished ETL run_id=521fc7553a51
+2026-04-08 15:04:32,796 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:32] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 15:04:32,800 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:32] "GET /etl/521fc7553a51 HTTP/1.1" 200 -
+2026-04-08 15:04:44,191 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:44] "GET / HTTP/1.1" 200 -
+2026-04-08 15:04:48,928 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:04:48] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 15:05:41,705 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 15:05:41,864 INFO werkzeug -  * Restarting with stat
+2026-04-08 15:05:42,511 WARNING werkzeug -  * Debugger is active!
+2026-04-08 15:05:42,517 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 15:05:44,550 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 15:05:44,650 INFO werkzeug -  * Restarting with stat
+2026-04-08 15:05:45,044 WARNING werkzeug -  * Debugger is active!
+2026-04-08 15:05:45,048 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 15:05:49,095 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/services/dashboard_charts.py', reloading
+2026-04-08 15:05:49,211 INFO werkzeug -  * Restarting with stat
+2026-04-08 15:05:49,617 WARNING werkzeug -  * Debugger is active!
+2026-04-08 15:05:49,621 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 15:05:51,656 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/routes/pages.py', reloading
+2026-04-08 15:05:51,749 INFO werkzeug -  * Restarting with stat
+2026-04-08 15:05:52,153 WARNING werkzeug -  * Debugger is active!
+2026-04-08 15:05:52,158 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 15:05:55,216 INFO werkzeug -  * Detected change in '/Users/selma/Desktop/mercedes/routes/pages.py', reloading
+2026-04-08 15:05:55,341 INFO werkzeug -  * Restarting with stat
+2026-04-08 15:05:55,758 WARNING werkzeug -  * Debugger is active!
+2026-04-08 15:05:55,764 INFO werkzeug -  * Debugger PIN: 821-944-661
+2026-04-08 15:06:20,005 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:20] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 15:06:24,451 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:24] "GET / HTTP/1.1" 200 -
+2026-04-08 15:06:26,089 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:26] "GET /upload HTTP/1.1" 200 -
+2026-04-08 15:06:32,882 INFO etl.pipeline - Starting ETL run_id=d379f6e855cb source=uploads/20260408_190632__Pricing_Analytics_Business_Case_data_vfinal.xlsx
+2026-04-08 15:06:32,975 INFO etl.steps.extract - Extracted sheet=Dealers key=dealers rows=20 cols=3
+2026-04-08 15:06:32,976 INFO etl.steps.extract - Extracted sheet=Models key=models rows=10 cols=2
+2026-04-08 15:06:32,978 INFO etl.steps.extract - Extracted sheet=Inventory key=inventory rows=200 cols=3
+2026-04-08 15:06:33,046 INFO etl.steps.extract - Extracted sheet=Sales key=sales rows=5000 cols=5
+2026-04-08 15:06:33,132 INFO etl.steps.extract - Extracted sheet=Interest_Rates key=interest_rates rows=4320 cols=10
+2026-04-08 15:06:33,140 INFO etl.steps.extract - Extracted sheet=Forecast_Assumptions key=forecast_assumptions rows=480 cols=6
+2026-04-08 15:06:33,353 INFO etl.pipeline - Finished ETL run_id=d379f6e855cb
+2026-04-08 15:06:33,353 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:33] "[32mPOST /upload HTTP/1.1[0m" 302 -
+2026-04-08 15:06:33,361 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:33] "GET /etl/d379f6e855cb HTTP/1.1" 200 -
+2026-04-08 15:06:47,691 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:47] "GET / HTTP/1.1" 200 -
+2026-04-08 15:06:49,210 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:06:49] "GET /dashboards HTTP/1.1" 200 -
+2026-04-08 15:11:11,164 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:11:11] "GET / HTTP/1.1" 200 -
+2026-04-08 15:11:11,189 INFO werkzeug - 127.0.0.1 - - [08/Apr/2026 15:11:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -

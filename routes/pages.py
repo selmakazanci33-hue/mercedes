@@ -9,7 +9,12 @@ from werkzeug.utils import secure_filename
 
 from config import settings
 from etl.pipeline import run_pipeline
-from services.dashboard_charts import build_dashboard_figures, build_dq_figure, compute_kpis
+from services.dashboard_charts import (
+    build_dashboard_figures,
+    build_dealer_summary_table,
+    build_dq_figure,
+    compute_kpis,
+)
 from services.db import engine as db_engine, get_session
 from services.repo import latest_pipeline_run
 from services.sales_analytics import load_dq_summary, load_enriched_sales_from_sqlite
@@ -68,8 +73,11 @@ def dashboards():
     eng = db_engine()
     enriched = load_enriched_sales_from_sqlite(eng)
     df = enriched.df if enriched is not None else None
-    figures = build_dashboard_figures(enriched)
+    # Optional ?top=N limits dealer line/bar charts to top N by revenue; omit for all dealers.
+    top_dealers_arg = request.args.get("top", type=int)
+    figures = build_dashboard_figures(enriched, top_n_dealers=top_dealers_arg)
     kpis = compute_kpis(df if df is not None else None)
+    dealer_rows = build_dealer_summary_table(df)
     dq_df = load_dq_summary(eng)
     dq_fig = build_dq_figure(dq_df)
     data_source = enriched.source if enriched is not None else "—"
@@ -77,6 +85,8 @@ def dashboards():
         "dashboards.html",
         figures=figures,
         kpis=kpis,
+        dealer_rows=dealer_rows,
+        dealer_chart_limited=top_dealers_arg is not None and top_dealers_arg > 0,
         dq_fig=dq_fig,
         data_source=data_source,
         has_sales=df is not None and not df.empty,
