@@ -15,6 +15,7 @@ from services.dashboard_charts import (
     build_dq_figure,
     compute_kpis,
 )
+from services.dashboard_narratives import build_dashboard_checklist, build_dashboard_narratives
 from services.db import engine as db_engine, get_session
 from services.repo import latest_pipeline_run
 from services.sales_analytics import load_dq_summary, load_enriched_sales_from_sqlite
@@ -81,6 +82,8 @@ def dashboards():
     dq_df = load_dq_summary(eng)
     dq_fig = build_dq_figure(dq_df)
     data_source = enriched.source if enriched is not None else "—"
+    narratives = build_dashboard_narratives(df, top_n_dealers=top_dealers_arg)
+    checklist = build_dashboard_checklist()
     return render_template(
         "dashboards.html",
         figures=figures,
@@ -90,5 +93,7 @@ def dashboards():
         dq_fig=dq_fig,
         data_source=data_source,
         has_sales=df is not None and not df.empty,
+        narratives=narratives,
+        checklist=checklist,
     )
 

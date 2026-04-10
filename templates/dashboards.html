@@ -160,6 +160,63 @@
         text-align: right;
         font-variant-numeric: tabular-nums;
       }
+      .chart-narrative {
+        margin-top: 12px;
+        padding: 14px 12px 16px;
+        border-top: 1px solid var(--border);
+        font-size: 0.875rem;
+        line-height: 1.55;
+        color: #333;
+      }
+      .chart-narrative p {
+        margin: 0 0 10px 0;
+      }
+      .chart-narrative p:last-child {
+        margin-bottom: 0;
+      }
+      .chart-narrative ul {
+        margin: 6px 0 10px 1.1rem;
+        padding: 0;
+      }
+      .chart-narrative li {
+        margin-bottom: 6px;
+      }
+      .chart-narrative .muted {
+        color: #666;
+      }
+      .checklist-wrap {
+        max-width: 1400px;
+        margin: 0 auto 48px;
+        padding: 0 24px;
+      }
+      .checklist-wrap h2 {
+        font-size: 1.05rem;
+        margin: 0 0 12px 0;
+        color: #111;
+      }
+      .checklist-section {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+      }
+      .checklist-section h3 {
+        margin: 0 0 8px 0;
+        font-size: 0.95rem;
+        font-weight: 650;
+        color: #1a5f4a;
+      }
+      .checklist-section ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+      .checklist-section li {
+        margin-bottom: 8px;
+        font-size: 0.875rem;
+        line-height: 1.45;
+        color: #333;
+      }
     </style>
   </head>
   <body>
@@ -254,32 +311,38 @@
       <section class="chart-card">
         <h2>Daily — total revenue</h2>
         <div id="plot-daily_total" class="plot"></div>
+        <div class="chart-narrative">{{ narratives.daily_total | safe }}</div>
       </section>
 
       <div class="two-col side-by-side">
         <section class="chart-card">
           <h2>Daily — by region</h2>
           <div id="plot-daily_by_region" class="plot"></div>
+          <div class="chart-narrative">{{ narratives.daily_by_region | safe }}</div>
         </section>
         <section class="chart-card">
           <h2>Daily — by dealer</h2>
           <div id="plot-daily_by_dealer" class="plot"></div>
+          <div class="chart-narrative">{{ narratives.daily_by_dealer | safe }}</div>
         </section>
       </div>
 
       <section class="chart-card">
         <h2>Monthly — total revenue</h2>
         <div id="plot-monthly_total" class="plot"></div>
+        <div class="chart-narrative">{{ narratives.monthly_total | safe }}</div>
       </section>
 
       <div class="two-col side-by-side">
         <section class="chart-card">
           <h2>Monthly — by region</h2>
           <div id="plot-monthly_by_region" class="plot"></div>
+          <div class="chart-narrative">{{ narratives.monthly_by_region | safe }}</div>
         </section>
         <section class="chart-card">
           <h2>Monthly — by dealer</h2>
           <div id="plot-monthly_by_dealer" class="plot"></div>
+          <div class="chart-narrative">{{ narratives.monthly_by_dealer | safe }}</div>
         </section>
       </div>
 
@@ -287,8 +350,32 @@
       <section class="chart-card">
         <h2>Data quality (SQLite: dq_issues)</h2>
         <div id="plot-dq" class="plot" style="min-height: 300px"></div>
+        <div class="chart-narrative">
+          <p>
+            This chart reflects <strong>recorded DQ issues</strong> from the latest ETL run. Treat
+            <strong>critical</strong> severity as a blocker for forecasting until keys and joins are clean.
+          </p>
+        </div>
       </section>
       {% endif %}
+    </div>
+
+    <div class="checklist-wrap">
+      <h2>Criteria, drivers &amp; follow-up questions (checklist)</h2>
+      <p style="font-size: 0.875rem; color: #555; margin: 0 0 14px 0">
+        Use this picklist to align charts with <strong>goals</strong>, <strong>ownership</strong>, and
+        <strong>missing data</strong> before drawing causal conclusions.
+      </p>
+      {% for section in checklist %}
+      <div class="checklist-section">
+        <h3>{{ section.title }}</h3>
+        <ul>
+          {% for item in section.items %}
+          <li>{{ item | safe }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
     </div>
 
     <script>
