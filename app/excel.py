@@ -1,6 +1,8 @@
-import pyodbc
-import pandas as pd
+import urllib.parse
 from pathlib import Path
+
+import pandas as pd
+from sqlalchemy import create_engine, text
 
 # =========================
 # AZURE SQL CONNECTION
@@ -13,10 +15,21 @@ DRIVER = "ODBC Driver 18 for SQL Server"
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-EXCEL_PATH = OUTPUT_DIR / "azure_db_discovery.xlsx"
+EXCEL_PATH = OUTPUT_DIR / "azure_834_2026_jan_may_all_issuers.xlsx"
+
+# Read-only candidate tables
+TABLES_TO_EXPORT = [
+    ("dbo", "834_Inbound_header_test"),
+    ("dbo", "834_Inbound_test"),
+    ("dbo", "Enrollments_PY2026"),
+    ("dbo", "PY2026-Enrollments_All"),
+    ("dbo", "hh_demographics_enrollees_PY2026"),
+    ("dbo", "concurrent_enrollments_cms"),
+    ("dbo", "DuplicateEnrollment_Overlap"),
+]
 
 
-def connect_to_azure_sql():
+def get_engine():
     conn_str = (
         f"DRIVER={{{DRIVER}}};"
         f"SERVER={SERVER};"
@@ -27,103 +40,208 @@ def connect_to_azure_sql():
         f"TrustServerCertificate=no;"
         f"Connection Timeout=30;"
     )
-    return pyodbc.connect(conn_str)
+
+    params = urllib.parse.quote_plus(conn_str)
+
+    return create_engine(
+        f"mssql+pyodbc:///?odbc_connect={params}",
+        fast_executemany=False
+    )
 
 
-def read_sql(conn, sql):
-    return pd.read_sql_query(sql, conn)
+def read_df(engine, sql):
+    with engine.connect() as conn:
+        return pd.read_sql_query(text(sql), conn)
 
 
-def main():
-    conn = connect_to_azure_sql()
-    print("Connected successfully.")
-
-    connection_info_sql = """
+def get_columns(engine, schema, table):
+    sql = f"""
     SELECT
-        @@SERVERNAME AS server_name,
-        DB_NAME() AS database_name,
-        SUSER_SNAME() AS login_name,
-        CURRENT_USER AS database_user,
-        @@VERSION AS sql_version;
-    """
-
-    tables_sql = """
-    SELECT
-        TABLE_SCHEMA,
-        TABLE_NAME,
-        TABLE_TYPE
-    FROM INFORMATION_SCHEMA.TABLES
-    ORDER BY TABLE_SCHEMA, TABLE_NAME;
-    """
-
-    columns_sql = """
-    SELECT
-        TABLE_SCHEMA,
-        TABLE_NAME,
         COLUMN_NAME,
         DATA_TYPE,
-        IS_NULLABLE,
         ORDINAL_POSITION
     FROM INFORMATION_SCHEMA.COLUMNS
-    ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;
+    WHERE TABLE_SCHEMA = '{schema}'
+      AND TABLE_NAME = '{table}'
+    ORDER BY ORDINAL_POSITION
+    """
+    return read_df(engine, sql)
+
+
+def pick_date_column(columns):
+    candidates = [
+        "GAA_834_File_Date",
+        "file_date",
+        "coverage_effective_date",
+        "benefit_effective_date",
+        "member_maint_effective_date",
+        "EffectiveDate",
+        "effective_date",
+        "created_date",
+        "load_date",
+        "GAA_Load_Date",
+    ]
+
+    existing = set(columns["COLUMN_NAME"].tolist())
+
+    for col in candidates:
+        if col in existing:
+            return col
+
+    for col in existing:
+        lower = col.lower()
+        if "date" in lower or "effective" in lower:
+            return col
+
+    return None
+
+
+def pick_issuer_column(columns):
+    candidates = [
+        "GAA_HIOS_ID",
+        "issuer",
+        "issuer_id",
+        "hios_id",
+        "HIOS_ID",
+        "Issuer_ID",
+    ]
+
+    existing = set(columns["COLUMN_NAME"].tolist())
+
+    for col in candidates:
+        if col in existing:
+            return col
+
+    for col in existing:
+        lower = col.lower()
+        if "hios" in lower or "issuer" in lower:
+            return col
+
+    return None
+
+
+def export_table(engine, schema, table):
+    columns = get_columns(engine, schema, table)
+
+    if columns.empty:
+        print(f"Skipping {schema}.{table}: no columns found")
+        return None, columns
+
+    date_col = pick_date_column(columns)
+    issuer_col = pick_issuer_column(columns)
+
+    full_name = f"[{schema}].[{table}]"
+
+    where_clauses = []
+
+    # Jan-May 2026
+    if date_col:
+        where_clauses.append(
+            f"TRY_CONVERT(date, [{date_col}]) >= '2026-01-01'"
+        )
+        where_clauses.append(
+            f"TRY_CONVERT(date, [{date_col}]) < '2026-06-01'"
+        )
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    sql = f"""
+    SELECT *
+    FROM {full_name}
+    {where_sql}
     """
 
-    search_834_tables_sql = """
-    SELECT
-        TABLE_SCHEMA,
-        TABLE_NAME,
-        TABLE_TYPE
-    FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_NAME LIKE '%834%'
-       OR TABLE_NAME LIKE '%Inbound%'
-       OR TABLE_NAME LIKE '%enroll%'
-       OR TABLE_NAME LIKE '%member%'
-       OR TABLE_NAME LIKE '%policy%'
-       OR TABLE_NAME LIKE '%detail%'
-       OR TABLE_NAME LIKE '%header%'
-    ORDER BY TABLE_SCHEMA, TABLE_NAME;
-    """
+    print(f"\nExporting {schema}.{table}")
+    print(f"Date column used: {date_col}")
+    print(f"Issuer column detected: {issuer_col}")
 
-    connection_info = read_sql(conn, connection_info_sql)
-    tables = read_sql(conn, tables_sql)
-    columns = read_sql(conn, columns_sql)
-    candidate_tables = read_sql(conn, search_834_tables_sql)
+    df = read_df(engine, sql)
 
-    # Row counts for candidate tables only
-    row_counts = []
+    df.insert(0, "_source_table", f"{schema}.{table}")
 
-    for _, row in candidate_tables.iterrows():
-        schema = row["TABLE_SCHEMA"]
-        table = row["TABLE_NAME"]
+    if date_col:
+        df.insert(1, "_filter_date_column", date_col)
 
-        try:
-            sql = f"SELECT COUNT(*) AS row_count FROM [{schema}].[{table}]"
-            count_df = read_sql(conn, sql)
+    if issuer_col:
+        df.insert(2, "_issuer_column_detected", issuer_col)
 
-            row_counts.append({
-                "TABLE_SCHEMA": schema,
-                "TABLE_NAME": table,
-                "row_count": int(count_df.iloc[0]["row_count"])
-            })
+    print(f"Rows exported: {len(df)}")
 
-            print(f"{schema}.{table}: {int(count_df.iloc[0]['row_count'])}")
+    return df, columns
 
-        except Exception as e:
-            row_counts.append({
-                "TABLE_SCHEMA": schema,
-                "TABLE_NAME": table,
-                "row_count": "ERROR",
-                "error": str(e)
-            })
 
-    row_counts_df = pd.DataFrame(row_counts)
+def normalize_and_cleanup(df):
+    clean = df.copy()
 
+    rename_map = {
+        "GAA_HIOS_ID": "issuer",
+        "GAA_834_File_Name": "file_name",
+        "GAA_834_File_Date": "file_date",
+        "GAA_Load_Date": "load_date",
+        "enrollment_count": "source_enrollment_count",
+        "enrollee_count": "source_enrollee_count",
+        "confirm_count": "source_confirm_count",
+        "term_count": "source_term_count",
+        "cancel_count": "source_cancel_count",
+        "record_count": "source_record_count",
+    }
+
+    clean = clean.rename(columns={k: v for k, v in rename_map.items() if k in clean.columns})
+
+    possible_status_cols = [
+        "additional_maint_reason_code",
+        "status",
+        "enrolleeStatus",
+        "maintenance_reason_code",
+    ]
+
+    status_col = next((c for c in possible_status_cols if c in clean.columns), None)
+
+    if status_col:
+        clean["normalized_status"] = clean[status_col].replace({
+            "REINSTATE": "CONFIRM"
+        })
+    else:
+        clean["normalized_status"] = None
+
+    if "insurance_type_code" in clean.columns:
+        clean["Insurance_Type"] = clean["insurance_type_code"].apply(
+            lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
+        )
+
+    def enrollment_key(row):
+        for col, prefix in [
+            ("policy_id", "policy"),
+            ("subscriber_id", "subscriber"),
+            ("household_or_employee_case_id", "household"),
+        ]:
+            if col in clean.columns:
+                val = row.get(col)
+                if pd.notna(val) and str(val).strip():
+                    return f"{prefix}:{val}"
+        return None
+
+    clean["enrollment_key"] = clean.apply(enrollment_key, axis=1)
+
+    return clean
+
+
+def write_excel(all_exports, all_columns):
     with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
-        connection_info.to_excel(writer, sheet_name="Connection_Info", index=False)
-        tables.to_excel(writer, sheet_name="All_Tables", index=False)
-        columns.to_excel(writer, sheet_name="All_Columns", index=False)
-        candidate_tables.to_excel(writer, sheet_name="Candidate_834_Tables", index=False)
-        row_counts_df.to_excel(writer, sheet_name="Candidate_Row_Counts", index=False)
+        # Table columns metadata
+        columns_df = pd.concat(all_columns, ignore_index=True) if all_columns else pd.DataFrame()
+        columns_df.to_excel(writer, sheet_name="Table_Columns", index=False)
+
+        for sheet_name, df in all_exports.items():
+            safe_name = sheet_name[:31]
+
+            # Excel sheet limit protection
+            if len(df) > 1_048_000:
+                df.head(1_048_000).to_excel(writer, sheet_name=safe_name, index=False)
+            else:
+                df.to_excel(writer, sheet_name=safe_name, index=False)
 
         for sheet_name in writer.book.sheetnames:
             ws = writer.book[sheet_name]
@@ -140,9 +258,35 @@ def main():
 
                 ws.column_dimensions[col_letter].width = min(max_len + 2, 45)
 
-    conn.close()
 
-    print("\nDiscovery completed.")
+def main():
+    engine = get_engine()
+
+    all_exports = {}
+    all_columns = []
+
+    for schema, table in TABLES_TO_EXPORT:
+        try:
+            df, columns = export_table(engine, schema, table)
+
+            if columns is not None and not columns.empty:
+                columns.insert(0, "TABLE_SCHEMA", schema)
+                columns.insert(1, "TABLE_NAME", table)
+                all_columns.append(columns)
+
+            if df is not None:
+                sheet_base = table.replace("-", "_")[:25]
+                all_exports[f"{sheet_base}_Raw"] = df
+
+                clean_df = normalize_and_cleanup(df)
+                all_exports[f"{sheet_base}_Clean"] = clean_df
+
+        except Exception as e:
+            print(f"ERROR exporting {schema}.{table}: {e}")
+
+    write_excel(all_exports, all_columns)
+
+    print("\nExcel created successfully:")
     print(EXCEL_PATH.resolve())
 
 
