@@ -1,255 +1,289 @@
-import sqlite3
-from pathlib import Path
+import pyodbc
 import pandas as pd
+from pathlib import Path
 
-DB_PATH = Path("data/issuer_834.db")
+# =========================
+# DUMMY AZURE SQL SETTINGS
+# =========================
+SERVER = "your-server-name.database.windows.net"
+DATABASE = "your-database-name"
+USERNAME = "your-username"
+PASSWORD = "your-password"
+DRIVER = "ODBC Driver 18 for SQL Server"
+
+SCHEMA_NAME = "dbo"
+TABLE_NAME = "834_Inbound_header_test"   # change if needed
+
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-EXCEL_PATH = OUTPUT_DIR / "issuer_15105_full_record_level_analysis.xlsx"
-TABLE_NAME = "stg_834_records"
-
-ISSUER = "15105"
-YEAR = "2026"
+EXCEL_PATH = OUTPUT_DIR / f"azure_{TABLE_NAME}_full_analysis.xlsx"
 
 
-def connect():
-    if not DB_PATH.exists():
-        raise FileNotFoundError(f"DB not found: {DB_PATH.resolve()}")
-    return sqlite3.connect(DB_PATH)
+def connect_to_azure_sql():
+    conn_str = (
+        f"DRIVER={{{DRIVER}}};"
+        f"SERVER={SERVER};"
+        f"DATABASE={DATABASE};"
+        f"UID={USERNAME};"
+        f"PWD={PASSWORD};"
+        f"Encrypt=yes;"
+        f"TrustServerCertificate=no;"
+        f"Connection Timeout=30;"
+    )
+    return pyodbc.connect(conn_str)
 
 
-def get_existing_columns(conn, table_name=TABLE_NAME):
-    cur = conn.cursor()
-    cur.execute(f"PRAGMA table_info({table_name})")
-    return {row[1] for row in cur.fetchall()}
+def read_table(conn):
+    sql = f"""
+    SELECT *
+    FROM [{SCHEMA_NAME}].[{TABLE_NAME}]
+    """
+    return pd.read_sql(sql, conn)
 
 
-def select_existing_columns(conn, wanted_columns):
-    existing = get_existing_columns(conn)
-    return [col for col in wanted_columns if col in existing]
-
-
-def build_select_sql(conn):
-    wanted_columns = [
-        "issuer",
-        "year",
-        "month",
-        "raw_xml_path",
-        "record_id",
-
-        "policy_id",
-        "member_id",
-        "subscriber_id",
-        "household_or_employee_case_id",
-
-        "relationship",
-        "subscriber_flag",
-        "insurance_type_code",
-
-        "additional_maint_reason_code",
-        "maintenance_type_code",
-        "enrollee_event_type_code",
-        "enrollee_event_reason_code",
-        "transaction_classification",
-        "coverage_status",
-
-        "benefit_effective_date",
-        "benefit_end_date",
-        "member_maint_effective_date",
-        "request_submit_timestamp",
-
-        "first_name",
-        "last_name",
-        "middle_name",
-        "name_prefix",
-        "name_suffix",
-        "birth_date",
-        "gender",
-        "ssn",
-
-        "address_line1",
-        "address_line2",
-        "city",
-        "state",
-        "zip_code",
-
-        "plan_id",
-        "qhp_id",
-        "csr_variant",
-        "aptc_amount",
-        "premium_amount",
-        "total_responsibility_amount",
-    ]
-
-    selected_columns = select_existing_columns(conn, wanted_columns)
-
-    if not selected_columns:
-        raise ValueError("No matching columns found in stg_834_records.")
-
+def get_table_columns(conn):
     sql = f"""
     SELECT
-        {", ".join(selected_columns)}
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-    ORDER BY
-        year,
-        month,
-        additional_maint_reason_code,
-        member_id,
-        policy_id
+        COLUMN_NAME,
+        DATA_TYPE,
+        IS_NULLABLE
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = '{SCHEMA_NAME}'
+      AND TABLE_NAME = '{TABLE_NAME}'
+    ORDER BY ORDINAL_POSITION
     """
-
-    return sql
-
-
-def read_sql(conn, sql):
-    try:
-        return pd.read_sql_query(sql, conn)
-    except Exception as e:
-        print("\nSQL failed:")
-        print(sql)
-        raise e
+    return pd.read_sql(sql, conn)
 
 
-def export_to_excel():
-    conn = connect()
+def normalize_columns(df):
+    rename_map = {
+        "GAA_HIOS_ID": "issuer",
+        "GAA_834_File_Name": "file_name",
+        "GAA_834_File_Date": "file_date",
+        "GAA_Load_Date": "load_date",
 
-    raw_sql = build_select_sql(conn)
+        "enrollment_count": "source_enrollment_count",
+        "enrollee_count": "source_enrollee_count",
+        "confirm_count": "source_confirm_count",
+        "term_count": "source_term_count",
+        "cancel_count": "source_cancel_count",
+        "record_count": "source_record_count",
 
-    duplicate_members_sql = f"""
-    SELECT
-        issuer,
-        year,
-        month,
-        additional_maint_reason_code AS status,
-        member_id,
-        COUNT(*) AS row_count,
-        COUNT(DISTINCT policy_id) AS distinct_policy_count,
-        COUNT(DISTINCT subscriber_id) AS distinct_subscriber_count,
-        MIN(member_maint_effective_date) AS first_maint_date,
-        MAX(member_maint_effective_date) AS latest_maint_date
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-      AND additional_maint_reason_code IN ('CONFIRM', 'CANCEL', 'TERM', 'REINSTATE')
-    GROUP BY issuer, year, month, additional_maint_reason_code, member_id
-    HAVING COUNT(*) > 1
-    ORDER BY month, status, row_count DESC
-    """
+        "GS02_application_sender_id": "application_sender_id",
+        "GS03_application_receiver_id": "application_receiver_id",
+        "GS04_date": "gs_date",
+        "GS05_time": "gs_time",
+        "GS06_group_control_number": "group_control_number",
 
-    duplicate_policies_sql = f"""
-    SELECT
-        issuer,
-        year,
-        month,
-        additional_maint_reason_code AS status,
-        policy_id,
-        COUNT(*) AS row_count,
-        COUNT(DISTINCT member_id) AS distinct_member_count,
-        COUNT(DISTINCT subscriber_id) AS distinct_subscriber_count,
-        MIN(member_maint_effective_date) AS first_maint_date,
-        MAX(member_maint_effective_date) AS latest_maint_date
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-      AND additional_maint_reason_code IN ('CONFIRM', 'CANCEL', 'TERM', 'REINSTATE')
-    GROUP BY issuer, year, month, additional_maint_reason_code, policy_id
-    HAVING COUNT(*) > 1
-    ORDER BY month, status, row_count DESC
-    """
-
-    same_member_multiple_policies_sql = f"""
-    SELECT
-        issuer,
-        year,
-        month,
-        member_id,
-        COUNT(DISTINCT policy_id) AS policy_count,
-        GROUP_CONCAT(DISTINCT policy_id) AS policy_ids,
-        GROUP_CONCAT(DISTINCT additional_maint_reason_code) AS statuses,
-        MIN(member_maint_effective_date) AS first_maint_date,
-        MAX(member_maint_effective_date) AS latest_maint_date
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-    GROUP BY issuer, year, month, member_id
-    HAVING COUNT(DISTINCT policy_id) > 1
-    ORDER BY month, policy_count DESC
-    """
-
-    same_policy_multiple_members_sql = f"""
-    SELECT
-        issuer,
-        year,
-        month,
-        policy_id,
-        COUNT(DISTINCT member_id) AS member_count,
-        GROUP_CONCAT(DISTINCT member_id) AS member_ids,
-        GROUP_CONCAT(DISTINCT additional_maint_reason_code) AS statuses,
-        MIN(member_maint_effective_date) AS first_maint_date,
-        MAX(member_maint_effective_date) AS latest_maint_date
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-    GROUP BY issuer, year, month, policy_id
-    HAVING COUNT(DISTINCT member_id) > 1
-    ORDER BY month, member_count DESC
-    """
-
-    status_summary_sql = f"""
-    SELECT
-        issuer,
-        year,
-        month,
-        additional_maint_reason_code AS status,
-        COUNT(*) AS raw_rows,
-        COUNT(DISTINCT policy_id) AS distinct_policies,
-        COUNT(DISTINCT member_id) AS distinct_members,
-        COUNT(DISTINCT subscriber_id) AS distinct_subscribers,
-        COUNT(DISTINCT household_or_employee_case_id) AS distinct_households
-    FROM {TABLE_NAME}
-    WHERE issuer = '{ISSUER}'
-      AND year = '{YEAR}'
-      AND additional_maint_reason_code IN ('CONFIRM', 'CANCEL', 'TERM', 'REINSTATE')
-    GROUP BY issuer, year, month, additional_maint_reason_code
-    ORDER BY year, month, status
-    """
-
-    dfs = {
-        "All_Raw_Data": read_sql(conn, raw_sql),
-        "Duplicate_Members": read_sql(conn, duplicate_members_sql),
-        "Duplicate_Policies": read_sql(conn, duplicate_policies_sql),
-        "Same_Member_Multiple_Policies": read_sql(conn, same_member_multiple_policies_sql),
-        "Same_Policy_Multiple_Members": read_sql(conn, same_policy_multiple_members_sql),
-        "Status_Summary": read_sql(conn, status_summary_sql),
+        "ISA06_interchange_sender_id": "interchange_sender_id",
+        "ISA08_interchange_partner_id": "interchange_partner_id",
+        "ISA09_interchange_date": "interchange_date",
+        "ISA10_interchange_time": "interchange_time",
+        "ISA13_control_number": "interchange_control_number",
+        "ISA15_usage_indicator_test_or_prod": "usage_indicator",
     }
 
-    with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
-        for sheet_name, df in dfs.items():
-            safe_sheet_name = sheet_name[:31]
-            df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+    return df
 
-            ws = writer.book[safe_sheet_name]
+
+def apply_cleanup_logic(df):
+    clean_df = df.copy()
+
+    # REINSTATE -> CONFIRM if status column exists
+    possible_status_cols = [
+        "additional_maint_reason_code",
+        "status",
+        "enrolleeStatus",
+        "maintenance_reason_code",
+    ]
+
+    status_col = next((c for c in possible_status_cols if c in clean_df.columns), None)
+
+    if status_col:
+        clean_df["normalized_status"] = clean_df[status_col].replace({
+            "REINSTATE": "CONFIRM"
+        })
+    else:
+        clean_df["normalized_status"] = None
+
+    # Health / Dental
+    if "insurance_type_code" in clean_df.columns:
+        clean_df["Insurance_Type"] = clean_df["insurance_type_code"].apply(
+            lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
+        )
+    else:
+        clean_df["Insurance_Type"] = None
+
+    # Enrollment key fallback
+    def build_enrollment_key(row):
+        for col, prefix in [
+            ("policy_id", "policy"),
+            ("subscriber_id", "subscriber"),
+            ("household_or_employee_case_id", "household"),
+        ]:
+            if col in clean_df.columns:
+                val = row.get(col)
+                if pd.notna(val) and str(val).strip() != "":
+                    return f"{prefix}:{val}"
+        return None
+
+    clean_df["enrollment_key"] = clean_df.apply(build_enrollment_key, axis=1)
+
+    return clean_df
+
+
+def create_summary_sheets(clean_df):
+    sheets = {}
+
+    sheets["Cleaned_Data"] = clean_df
+
+    # Header/source summary if this is header table
+    summary_cols = [
+        c for c in [
+            "issuer",
+            "file_name",
+            "file_date",
+            "load_date",
+            "source_record_count",
+            "source_enrollment_count",
+            "source_enrollee_count",
+            "source_confirm_count",
+            "source_cancel_count",
+            "source_term_count",
+        ]
+        if c in clean_df.columns
+    ]
+
+    if summary_cols:
+        sheets["Source_File_Summary"] = clean_df[summary_cols].copy()
+
+    # Status summary if member-level columns exist
+    if "normalized_status" in clean_df.columns:
+        group_cols = [c for c in ["issuer", "year", "month", "Insurance_Type", "normalized_status"] if c in clean_df.columns]
+
+        if group_cols:
+            agg_dict = {}
+            if "enrollment_key" in clean_df.columns:
+                agg_dict["enrollment_key"] = pd.Series.nunique
+            if "member_id" in clean_df.columns:
+                agg_dict["member_id"] = pd.Series.nunique
+            if "policy_id" in clean_df.columns:
+                agg_dict["policy_id"] = pd.Series.nunique
+
+            if agg_dict:
+                status_summary = (
+                    clean_df
+                    .groupby(group_cols, dropna=False)
+                    .agg(agg_dict)
+                    .reset_index()
+                    .rename(columns={
+                        "enrollment_key": "Enrollment_Count",
+                        "member_id": "Enrollee_Count",
+                        "policy_id": "Distinct_Policies",
+                    })
+                )
+                sheets["Cleaned_Status_Summary"] = status_summary
+
+    # Duplicate members
+    if "member_id" in clean_df.columns:
+        duplicate_members = (
+            clean_df
+            .groupby(["member_id"], dropna=False)
+            .size()
+            .reset_index(name="row_count")
+        )
+        duplicate_members = duplicate_members[duplicate_members["row_count"] > 1]
+        sheets["Duplicate_Members"] = duplicate_members
+
+    # Duplicate policies
+    if "policy_id" in clean_df.columns:
+        duplicate_policies = (
+            clean_df
+            .groupby(["policy_id"], dropna=False)
+            .size()
+            .reset_index(name="row_count")
+        )
+        duplicate_policies = duplicate_policies[duplicate_policies["row_count"] > 1]
+        sheets["Duplicate_Policies"] = duplicate_policies
+
+    # Same member multiple policies
+    if "member_id" in clean_df.columns and "policy_id" in clean_df.columns:
+        member_policy = (
+            clean_df
+            .groupby("member_id", dropna=False)["policy_id"]
+            .nunique()
+            .reset_index(name="policy_count")
+        )
+        member_policy = member_policy[member_policy["policy_count"] > 1]
+        sheets["Same_Member_Multiple_Policies"] = member_policy
+
+    return sheets
+
+
+def export_excel(raw_df, clean_df, table_info, sheets):
+    with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
+        table_info.to_excel(writer, sheet_name="Table_Info", index=False)
+        raw_df.to_excel(writer, sheet_name="Raw_Azure_Data", index=False)
+
+        for sheet_name, df in sheets.items():
+            safe_name = sheet_name[:31]
+            df.to_excel(writer, sheet_name=safe_name, index=False)
+
+            ws = writer.book[safe_name]
             ws.freeze_panes = "A2"
             ws.auto_filter.ref = ws.dimensions
 
             for col in ws.columns:
                 max_length = 0
                 col_letter = col[0].column_letter
-
                 for cell in col:
                     value = "" if cell.value is None else str(cell.value)
                     max_length = max(max_length, len(value))
-
                 ws.column_dimensions[col_letter].width = min(max_length + 2, 45)
+
+        for sheet_name in ["Table_Info", "Raw_Azure_Data"]:
+            ws = writer.book[sheet_name]
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+
+            for col in ws.columns:
+                max_length = 0
+                col_letter = col[0].column_letter
+                for cell in col:
+                    value = "" if cell.value is None else str(cell.value)
+                    max_length = max(max_length, len(value))
+                ws.column_dimensions[col_letter].width = min(max_length + 2, 45)
+
+
+def main():
+    conn = connect_to_azure_sql()
+
+    print("Connected to Azure SQL.")
+
+    table_info = get_table_columns(conn)
+    raw_df = read_table(conn)
+
+    print(f"Rows pulled from Azure: {len(raw_df)}")
+
+    normalized_df = normalize_columns(raw_df)
+    clean_df = apply_cleanup_logic(normalized_df)
+
+    sheets = create_summary_sheets(clean_df)
+
+    export_excel(
+        raw_df=raw_df,
+        clean_df=clean_df,
+        table_info=table_info,
+        sheets=sheets
+    )
 
     conn.close()
 
-    print(f"\nExcel export completed successfully:")
+    print("Excel export completed:")
     print(EXCEL_PATH.resolve())
 
 
 if __name__ == "__main__":
-    export_to_excel()
+    main()
