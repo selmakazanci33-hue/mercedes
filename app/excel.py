@@ -1,4 +1,3 @@
-import sqlite3
 import urllib.parse
 from pathlib import Path
 
@@ -7,32 +6,20 @@ from sqlalchemy import create_engine, text
 
 
 # =========================
-# SETTINGS
+# AZURE SQL CONNECTION
 # =========================
-YEAR = 2026
-START_DATE = "2026-01-01"
-END_DATE = "2026-06-01"   # Jan-May only
-
-OUTPUT_DIR = Path("query_outputs")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-AZURE_REPORT = OUTPUT_DIR / "azure_db_report_2026_jan_may.xlsx"
-XML_REPORT = OUTPUT_DIR / "xml_834_report_2026_jan_may.xlsx"
-COMPARISON_REPORT = OUTPUT_DIR / "db_vs_xml_comparison_2026_jan_may.xlsx"
-
-SQLITE_DB_PATH = Path("data/issuer_834.db")
-
-# Azure SQL
 SERVER = "ga......"       # Data Source
 DATABASE = "ga......"     # Initial Catalog
 USERNAME = "sk..."        # User ID
 DRIVER = "ODBC Driver 18 for SQL Server"
 
+OUTPUT_DIR = Path("query_outputs")
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# =========================
-# AZURE CONNECTION
-# =========================
-def get_azure_engine():
+EXCEL_PATH = OUTPUT_DIR / "azure_production_table_discovery.xlsx"
+
+
+def get_engine():
     conn_str = (
         f"DRIVER={{{DRIVER}}};"
         f"SERVER={SERVER};"
@@ -48,248 +35,145 @@ def get_azure_engine():
     return create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
 
 
-# =========================
-# AZURE DB REPORT
-# =========================
-def get_azure_detail(engine):
-    sql = f"""
-    WITH long_data AS (
-
-        SELECT
-            'PA' AS source_side,
-            PA_hios_issuer_id AS issuer,
-            PA_insurer_name AS insurer_name,
-            PA_coverage_year AS coverage_year,
-            PA_ssap_application_id AS application_id,
-            PA_household_id AS household_id,
-            PA_enrollment_id AS enrollment_id,
-            PA_enrollee_id AS enrollee_id,
-            PA_relationship_type AS relationship_type,
-            PA_person_type AS person_type,
-            PA_Insurance_Type AS insurance_type,
-            PA_enrollment_status_description AS enrollment_status,
-            PA_enrollee_status_description AS enrollee_status,
-            PA_benefit_effective_date AS benefit_effective_date,
-            PA_benefit_end_date AS benefit_end_date,
-            PA_enrollment_confirmation_date AS enrollment_confirmation_date,
-            PA_enrollment_create_date AS enrollment_create_date,
-            PA_enrollment_last_update_date AS enrollment_last_update_date
-        FROM dbo.DuplicateEnrollment_Overlap
-
-        UNION ALL
-
-        SELECT
-            'S' AS source_side,
-            S_hios_issuer_id AS issuer,
-            S_insurer_name AS insurer_name,
-            S_coverage_year AS coverage_year,
-            S_ssap_application_id AS application_id,
-            S_household_id AS household_id,
-            S_enrollment_id AS enrollment_id,
-            S_enrollee_id AS enrollee_id,
-            S_relationship_type AS relationship_type,
-            S_person_type AS person_type,
-            S_Insurance_Type AS insurance_type,
-            S_enrollment_status_description AS enrollment_status,
-            S_enrollee_status_description AS enrollee_status,
-            S_benefit_effective_date AS benefit_effective_date,
-            S_benefit_end_date AS benefit_end_date,
-            S_enrollment_confirmation_date AS enrollment_confirmation_date,
-            S_enrollment_create_date AS enrollment_create_date,
-            S_enrollment_last_update_date AS enrollment_last_update_date
-        FROM dbo.DuplicateEnrollment_Overlap
-    )
-    SELECT *
-    FROM long_data
-    WHERE coverage_year = {YEAR}
-      AND issuer IS NOT NULL
-      AND (
-            benefit_effective_date >= '{START_DATE}' AND benefit_effective_date < '{END_DATE}'
-         OR enrollment_confirmation_date >= '{START_DATE}' AND enrollment_confirmation_date < '{END_DATE}'
-         OR enrollment_create_date >= '{START_DATE}' AND enrollment_create_date < '{END_DATE}'
-         OR enrollment_last_update_date >= '{START_DATE}' AND enrollment_last_update_date < '{END_DATE}'
-      );
-    """
-
-    return pd.read_sql_query(text(sql), engine)
+def read_sql(engine, sql):
+    with engine.connect() as conn:
+        return pd.read_sql_query(text(sql), conn)
 
 
-def clean_azure(df):
-    clean = df.copy()
-
-    clean["month"] = pd.to_datetime(
-        clean["benefit_effective_date"].fillna(clean["enrollment_confirmation_date"]),
-        errors="coerce"
-    ).dt.strftime("%m")
-
-    clean["normalized_status"] = clean["enrollment_status"].replace({
-        "Enrolled": "CONFIRM",
-        "Pending": "CONFIRM",
-        "Pend": "CONFIRM",
-        "Cancelled": "CANCEL",
-        "Pend canceled": "CANCEL",
-        "Terminated": "TERM",
-        "Aborted": "ABORTED"
-    })
-
-    clean["normalized_insurance_type"] = clean["insurance_type"].fillna("Unknown")
-
-    return clean
-
-
-def summarize_azure(clean):
-    return (
-        clean
-        .groupby(
-            ["issuer", "coverage_year", "month", "normalized_insurance_type", "normalized_status"],
-            dropna=False
-        )
-        .agg(
-            db_raw_rows=("enrollment_id", "size"),
-            db_enrollment_count=("enrollment_id", "nunique"),
-            db_enrollee_count=("enrollee_id", "nunique"),
-            db_application_count=("application_id", "nunique"),
-            db_household_count=("household_id", "nunique")
-        )
-        .reset_index()
-        .rename(columns={
-            "coverage_year": "year",
-            "normalized_insurance_type": "insurance_type",
-            "normalized_status": "status"
-        })
-    )
-
-
-# =========================
-# XML / SQLITE REPORT
-# =========================
-def get_sqlite_detail():
-    if not SQLITE_DB_PATH.exists():
-        raise FileNotFoundError(f"SQLite DB not found: {SQLITE_DB_PATH.resolve()}")
-
-    conn = sqlite3.connect(SQLITE_DB_PATH)
-
-    sql = f"""
+def get_connection_info(engine):
+    sql = """
     SELECT
-        issuer,
-        year,
-        month,
-        policy_id,
-        member_id,
-        subscriber_id,
-        household_or_employee_case_id,
-        insurance_type_code,
-        additional_maint_reason_code,
-        benefit_effective_date,
-        benefit_end_date,
-        member_maint_effective_date,
-        raw_xml_path
-    FROM stg_834_records
-    WHERE year = '{YEAR}'
-      AND month IN ('01','02','03','04','05')
-      AND additional_maint_reason_code IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM');
+        @@SERVERNAME AS server_name,
+        DB_NAME() AS database_name,
+        SUSER_SNAME() AS login_name,
+        CURRENT_USER AS database_user,
+        @@VERSION AS sql_version;
     """
-
-    df = pd.read_sql_query(sql, conn)
-    conn.close()
-    return df
+    return read_sql(engine, sql)
 
 
-def clean_xml(df):
-    clean = df.copy()
-
-    clean["status"] = clean["additional_maint_reason_code"].replace({
-        "REINSTATE": "CONFIRM"
-    })
-
-    clean["insurance_type"] = clean["insurance_type_code"].apply(
-        lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
-    )
-
-    def enrollment_key(row):
-        for col, prefix in [
-            ("policy_id", "policy"),
-            ("subscriber_id", "subscriber"),
-            ("household_or_employee_case_id", "household"),
-        ]:
-            val = row.get(col)
-            if pd.notna(val) and str(val).strip():
-                return f"{prefix}:{val}"
-        return None
-
-    clean["enrollment_key"] = clean.apply(enrollment_key, axis=1)
-
-    return clean
+def get_all_tables(engine):
+    sql = """
+    SELECT
+        TABLE_SCHEMA,
+        TABLE_NAME,
+        TABLE_TYPE
+    FROM INFORMATION_SCHEMA.TABLES
+    ORDER BY TABLE_SCHEMA, TABLE_NAME;
+    """
+    return read_sql(engine, sql)
 
 
-def summarize_xml(clean):
-    return (
-        clean
-        .groupby(["issuer", "year", "month", "insurance_type", "status"], dropna=False)
-        .agg(
-            xml_raw_rows=("member_id", "size"),
-            xml_enrollment_count=("enrollment_key", "nunique"),
-            xml_enrollee_count=("member_id", "nunique"),
-            xml_policy_count=("policy_id", "nunique"),
-            xml_subscriber_count=("subscriber_id", "nunique")
-        )
-        .reset_index()
-    )
+def get_all_columns(engine):
+    sql = """
+    SELECT
+        TABLE_SCHEMA,
+        TABLE_NAME,
+        COLUMN_NAME,
+        DATA_TYPE,
+        IS_NULLABLE,
+        ORDINAL_POSITION
+    FROM INFORMATION_SCHEMA.COLUMNS
+    ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;
+    """
+    return read_sql(engine, sql)
 
 
-# =========================
-# COMPARISON
-# =========================
-def compare_reports(db_summary, xml_summary):
-    db_summary["issuer"] = db_summary["issuer"].astype(str)
-    db_summary["year"] = db_summary["year"].astype(str)
-    db_summary["month"] = db_summary["month"].astype(str).str.zfill(2)
-
-    xml_summary["issuer"] = xml_summary["issuer"].astype(str)
-    xml_summary["year"] = xml_summary["year"].astype(str)
-    xml_summary["month"] = xml_summary["month"].astype(str).str.zfill(2)
-
-    comparison = pd.merge(
-        db_summary,
-        xml_summary,
-        how="outer",
-        on=["issuer", "year", "month", "insurance_type", "status"]
-    )
-
-    for col in [
-        "db_raw_rows", "db_enrollment_count", "db_enrollee_count",
-        "xml_raw_rows", "xml_enrollment_count", "xml_enrollee_count"
-    ]:
-        if col in comparison.columns:
-            comparison[col] = comparison[col].fillna(0).astype(int)
-
-    comparison["enrollment_diff"] = (
-        comparison["db_enrollment_count"] - comparison["xml_enrollment_count"]
-    )
-
-    comparison["enrollee_diff"] = (
-        comparison["db_enrollee_count"] - comparison["xml_enrollee_count"]
-    )
-
-    comparison["raw_row_diff"] = (
-        comparison["db_raw_rows"] - comparison["xml_raw_rows"]
-    )
-
-    comparison["match_status"] = comparison.apply(
-        lambda r: "MATCH"
-        if r["enrollment_diff"] == 0 and r["enrollee_diff"] == 0
-        else "MISMATCH",
-        axis=1
-    )
-
-    return comparison
+def get_candidate_tables(engine):
+    sql = """
+    SELECT
+        c.TABLE_SCHEMA,
+        c.TABLE_NAME,
+        COUNT(*) AS matching_columns,
+        STRING_AGG(c.COLUMN_NAME, ', ') AS matched_columns
+    FROM INFORMATION_SCHEMA.COLUMNS c
+    WHERE
+           LOWER(c.COLUMN_NAME) LIKE '%issuer%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%hios%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%policy%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%member%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%subscriber%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%enrollee%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%enrollment%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%status%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%maint%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%effective%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%benefit%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%coverage%'
+        OR LOWER(c.COLUMN_NAME) LIKE '%application%'
+    GROUP BY
+        c.TABLE_SCHEMA,
+        c.TABLE_NAME
+    HAVING COUNT(*) >= 5
+    ORDER BY matching_columns DESC;
+    """
+    return read_sql(engine, sql)
 
 
-# =========================
-# EXCEL WRITER
-# =========================
-def write_excel(path, sheets):
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+def get_table_row_counts(engine, candidate_tables):
+    results = []
+
+    for _, row in candidate_tables.iterrows():
+        schema = row["TABLE_SCHEMA"]
+        table = row["TABLE_NAME"]
+
+        try:
+            sql = f"SELECT COUNT(*) AS row_count FROM [{schema}].[{table}]"
+            df = read_sql(engine, sql)
+            row_count = int(df.iloc[0]["row_count"])
+
+            print(f"{schema}.{table}: {row_count}")
+
+            results.append({
+                "TABLE_SCHEMA": schema,
+                "TABLE_NAME": table,
+                "row_count": row_count,
+                "status": "OK",
+                "error": None
+            })
+
+        except Exception as e:
+            print(f"ERROR {schema}.{table}: {e}")
+
+            results.append({
+                "TABLE_SCHEMA": schema,
+                "TABLE_NAME": table,
+                "row_count": None,
+                "status": "ERROR",
+                "error": str(e)
+            })
+
+    return pd.DataFrame(results)
+
+
+def get_sample_data(engine, candidate_tables, max_tables=12):
+    samples = {}
+
+    for _, row in candidate_tables.head(max_tables).iterrows():
+        schema = row["TABLE_SCHEMA"]
+        table = row["TABLE_NAME"]
+        sheet_name = f"{table[:25]}_Sample"
+
+        try:
+            sql = f"""
+            SELECT TOP 50 *
+            FROM [{schema}].[{table}]
+            """
+            df = read_sql(engine, sql)
+            samples[sheet_name] = df
+
+            print(f"Sample pulled: {schema}.{table}")
+
+        except Exception as e:
+            samples[sheet_name] = pd.DataFrame({
+                "error": [str(e)]
+            })
+
+    return samples
+
+
+def write_excel(sheets):
+    with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             safe_name = sheet_name[:31]
             df.to_excel(writer, sheet_name=safe_name, index=False)
@@ -310,51 +194,43 @@ def write_excel(path, sheets):
                 ws.column_dimensions[col_letter].width = min(max_len + 2, 45)
 
 
-# =========================
-# MAIN
-# =========================
 def main():
-    print("Connecting to Azure DB...")
-    engine = get_azure_engine()
+    print("Connecting to Azure SQL...")
+    engine = get_engine()
 
-    print("Reading Azure DB data...")
-    azure_raw = get_azure_detail(engine)
-    azure_clean = clean_azure(azure_raw)
-    azure_summary = summarize_azure(azure_clean)
+    print("Reading connection info...")
+    connection_info = get_connection_info(engine)
 
-    print("Reading XML / SQLite data...")
-    xml_raw = get_sqlite_detail()
-    xml_clean = clean_xml(xml_raw)
-    xml_summary = summarize_xml(xml_clean)
+    print("Reading all tables...")
+    all_tables = get_all_tables(engine)
 
-    print("Creating comparison...")
-    comparison = compare_reports(azure_summary, xml_summary)
+    print("Reading all columns...")
+    all_columns = get_all_columns(engine)
 
-    print("Writing Azure DB report...")
-    write_excel(AZURE_REPORT, {
-        "Azure_Raw_Data": azure_raw,
-        "Azure_Clean_Data": azure_clean,
-        "Azure_Summary": azure_summary
-    })
+    print("Finding candidate production tables...")
+    candidate_tables = get_candidate_tables(engine)
 
-    print("Writing XML report...")
-    write_excel(XML_REPORT, {
-        "XML_Raw_Data": xml_raw,
-        "XML_Clean_Data": xml_clean,
-        "XML_Summary": xml_summary
-    })
+    print("Counting rows for candidate tables...")
+    row_counts = get_table_row_counts(engine, candidate_tables)
 
-    print("Writing comparison report...")
-    write_excel(COMPARISON_REPORT, {
-        "DB_vs_XML_Comparison": comparison,
-        "Azure_Summary": azure_summary,
-        "XML_Summary": xml_summary
-    })
+    print("Pulling TOP 50 sample rows from top candidate tables...")
+    samples = get_sample_data(engine, candidate_tables, max_tables=12)
 
-    print("\nDone.")
-    print(AZURE_REPORT.resolve())
-    print(XML_REPORT.resolve())
-    print(COMPARISON_REPORT.resolve())
+    sheets = {
+        "Connection_Info": connection_info,
+        "All_Tables": all_tables,
+        "All_Columns": all_columns,
+        "Candidate_Tables": candidate_tables,
+        "Candidate_Row_Counts": row_counts,
+    }
+
+    sheets.update(samples)
+
+    print("Writing Excel...")
+    write_excel(sheets)
+
+    print("\nDiscovery completed successfully:")
+    print(EXCEL_PATH.resolve())
 
 
 if __name__ == "__main__":
