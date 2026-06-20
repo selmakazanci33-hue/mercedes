@@ -1,223 +1,385 @@
 import sqlite3
+import urllib.parse
 from pathlib import Path
 import pandas as pd
+from sqlalchemy import create_engine, text
 
+# =========================
+# CONFIG
+# =========================
 
-DB_PATH = Path("data/issuer_834.db")
+SERVER = "ga......"
+DATABASE = "ga......"
+USERNAME = "sk..."
+DRIVER = "ODBC Driver 18 for SQL Server"
+
+SQLITE_DB_PATH = Path("data/issuer_834.db")
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-OUTPUT_EXCEL = OUTPUT_DIR / "investigate_15105_jan_2026_lifecycle.xlsx"
-
-ISSUER = "15105"
-FOCUS_YEAR = "2026"
-FOCUS_MONTH = "01"
+OUTPUT_EXCEL = OUTPUT_DIR / "FINAL_XML_vs_AZURE_ENROLLMENTS_ORACLE.xlsx"
 
 HISTORY_MONTHS = [
-    ("2025", "10"),
-    ("2025", "11"),
-    ("2025", "12"),
-    ("2026", "01"),
+    ("2025", "10"), ("2025", "11"), ("2025", "12"),
+    ("2026", "01"), ("2026", "02"), ("2026", "03"), ("2026", "04"), ("2026", "05"),
+]
+
+REPORT_MONTHS = [
+    ("2026", "01"), ("2026", "02"), ("2026", "03"), ("2026", "04"), ("2026", "05"),
 ]
 
 
-def get_columns(conn, table="stg_834_records"):
-    cur = conn.cursor()
-    cur.execute(f"PRAGMA table_info({table})")
-    return [row[1] for row in cur.fetchall()]
+# =========================
+# AZURE CONNECTION
+# =========================
 
-
-def col_expr(columns, col_name, alias=None):
-    alias = alias or col_name
-    if col_name in columns:
-        return f"{col_name} AS {alias}"
-    return f"NULL AS {alias}"
-
-
-def load_data():
-    conn = sqlite3.connect(DB_PATH)
-    columns = get_columns(conn)
-
-    select_cols = [
-        col_expr(columns, "issuer"),
-        col_expr(columns, "year"),
-        col_expr(columns, "month"),
-        col_expr(columns, "policy_id"),
-        col_expr(columns, "member_id"),
-        col_expr(columns, "subscriber_id"),
-        col_expr(columns, "household_or_employee_case_id", "household_id"),
-        col_expr(columns, "insurance_type_code"),
-        col_expr(columns, "additional_maint_reason_code", "status"),
-        col_expr(columns, "maintenance_type_code"),
-        col_expr(columns, "enrollee_event_type_code"),
-        col_expr(columns, "enrollee_event_reason_code"),
-        col_expr(columns, "subscriber_flag"),
-        col_expr(columns, "relationship"),
-        col_expr(columns, "benefit_effective_date"),
-        col_expr(columns, "benefit_end_date"),
-        col_expr(columns, "member_maint_effective_date"),
-        col_expr(columns, "raw_xml_path"),
-        col_expr(columns, "previousExchgAssignedPolicyID", "previous_policy_id"),
-        col_expr(columns, "previous_exchg_assigned_policy_id", "previous_policy_id_alt"),
-        col_expr(columns, "renewalStatus", "renewal_status"),
-        col_expr(columns, "renewal_status", "renewal_status_alt"),
-    ]
-
-    history_where = " OR ".join(
-        [f"(year='{y}' AND month='{m}')" for y, m in HISTORY_MONTHS]
+def get_azure_engine():
+    conn_str = (
+        f"DRIVER={{{DRIVER}}};"
+        f"SERVER={SERVER};"
+        f"DATABASE={DATABASE};"
+        f"UID={USERNAME};"
+        f"Authentication=ActiveDirectoryInteractive;"
+        f"Encrypt=yes;"
+        f"TrustServerCertificate=no;"
+        f"Connection Timeout=30;"
     )
+    params = urllib.parse.quote_plus(conn_str)
+    return create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
+
+
+def read_azure(engine, sql):
+    with engine.connect() as conn:
+        return pd.read_sql_query(text(sql), conn)
+
+
+# =========================
+# XML / SQLITE
+# =========================
+
+def read_xml_sqlite():
+    where_sql = " OR ".join([f"(year='{y}' AND month='{m}')" for y, m in HISTORY_MONTHS])
 
     sql = f"""
-    WITH focus_members AS (
-        SELECT DISTINCT member_id
-        FROM stg_834_records
-        WHERE issuer = '{ISSUER}'
-          AND year = '{FOCUS_YEAR}'
-          AND month = '{FOCUS_MONTH}'
-          AND additional_maint_reason_code IN ('CONFIRM','REINSTATE','CANCEL','TERM')
-    )
     SELECT
-        {", ".join(select_cols)}
+        issuer,
+        year,
+        month,
+        policy_id,
+        member_id,
+        subscriber_id,
+        household_or_employee_case_id AS household_id,
+        insurance_type_code,
+        additional_maint_reason_code,
+        benefit_effective_date,
+        benefit_end_date,
+        member_maint_effective_date,
+        raw_xml_path
     FROM stg_834_records
-    WHERE issuer = '{ISSUER}'
-      AND ({history_where})
-      AND member_id IN (SELECT member_id FROM focus_members)
-      AND additional_maint_reason_code IN ('CONFIRM','REINSTATE','CANCEL','TERM')
+    WHERE ({where_sql})
+      AND additional_maint_reason_code IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
     """
 
+    conn = sqlite3.connect(SQLITE_DB_PATH)
     df = pd.read_sql_query(sql, conn)
     conn.close()
     return df
 
 
-def clean(df):
+def clean_xml(df):
     df = df.copy()
 
-    df["status_normalized"] = df["status"].replace({"REINSTATE": "CONFIRM"})
+    df["source"] = "XML"
+    df["issuer"] = df["issuer"].astype(str)
+    df["year"] = df["year"].astype(str)
+    df["month"] = df["month"].astype(str).str.zfill(2)
+
+    df["xml_status"] = df["additional_maint_reason_code"].replace({"REINSTATE": "CONFIRM"})
+
     df["insurance_type"] = df["insurance_type_code"].apply(
         lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
     )
 
-    for c in ["policy_id", "member_id", "subscriber_id", "household_id"]:
-        df[c] = df[c].astype(str).replace(["None", "nan", "NaN", ""], pd.NA)
-
-    df["enrollment_key"] = df["policy_id"].fillna(df["subscriber_id"]).fillna(df["household_id"])
-
-    df["person_key"] = (
-        df["issuer"].astype(str) + "|" +
-        df["insurance_type"].astype(str) + "|" +
-        df["member_id"].astype(str)
-    )
-
-    df["entity_key"] = (
-        df["person_key"] + "|" +
-        df["enrollment_key"].astype(str)
-    )
+    df["policy_id"] = df["policy_id"].astype(str)
+    df["member_id"] = df["member_id"].astype(str)
 
     df["benefit_effective_date"] = pd.to_datetime(df["benefit_effective_date"], errors="coerce")
     df["benefit_end_date"] = pd.to_datetime(df["benefit_end_date"], errors="coerce")
     df["member_maint_effective_date"] = pd.to_datetime(df["member_maint_effective_date"], errors="coerce")
 
-    df["event_month"] = df["year"].astype(str) + "-" + df["month"].astype(str).str.zfill(2)
-
-    df["event_date"] = (
-        df["member_maint_effective_date"]
-        .fillna(df["benefit_effective_date"])
-        .fillna(pd.to_datetime(df["event_month"] + "-01", errors="coerce"))
+    df["report_flag"] = df[["year", "month"]].apply(
+        lambda r: (r["year"], r["month"]) in REPORT_MONTHS,
+        axis=1
     )
 
-    df["is_focus_month_record"] = (
-        (df["year"] == FOCUS_YEAR) &
-        (df["month"] == FOCUS_MONTH)
+    df["join_key"] = (
+        df["issuer"] + "|" +
+        df["policy_id"] + "|" +
+        df["member_id"] + "|" +
+        df["insurance_type"]
     )
 
-    return df.sort_values(
-        ["member_id", "policy_id", "event_date", "year", "month", "raw_xml_path"]
+    # one row per XML business entity
+    df = df.sort_values([
+        "join_key",
+        "member_maint_effective_date",
+        "benefit_effective_date",
+        "raw_xml_path"
+    ])
+
+    df = df.drop_duplicates(["join_key", "year", "month"], keep="last")
+
+    return df
+
+
+# =========================
+# AZURE FINAL BUSINESS TABLE
+# =========================
+
+def read_azure_enrollments(engine):
+    sql = """
+    SELECT
+        coverage_year AS year,
+        hios_issuer_id AS issuer,
+        Insurance_Type AS insurance_type,
+        enrollment_id AS policy_id,
+        enrollee_id AS member_id,
+        enrollment_status_description,
+        enrollee_status_description,
+        benefit_effective_date,
+        benefit_end_date,
+        enrollment_confirmation_date,
+        enrollment_create_date,
+        enrollment_last_update_date,
+        enrollee_start_date,
+        enrollee_end_date,
+        enrollee_create_date,
+        enrollee_last_update_date
+    FROM dbo.Enrollments_PY2026
+    WHERE coverage_year = 2026
+    """
+
+    return read_azure(engine, sql)
+
+
+def clean_azure(df):
+    df = df.copy()
+
+    df["source"] = "AZURE_ENROLLMENTS_PY2026"
+    df["issuer"] = df["issuer"].astype(str)
+    df["year"] = df["year"].astype(str)
+    df["policy_id"] = df["policy_id"].astype(str)
+    df["member_id"] = df["member_id"].astype(str)
+
+    df["insurance_type"] = df["insurance_type"].apply(
+        lambda x: "Dental" if str(x).lower().startswith("dent") else "Health"
     )
 
+    for col in [
+        "benefit_effective_date",
+        "benefit_end_date",
+        "enrollment_confirmation_date",
+        "enrollment_create_date",
+        "enrollment_last_update_date",
+        "enrollee_start_date",
+        "enrollee_end_date",
+        "enrollee_create_date",
+        "enrollee_last_update_date",
+    ]:
+        df[col] = pd.to_datetime(df[col], errors="coerce")
 
-def create_member_policy_summary(df):
-    return (
-        df.groupby(["member_id", "insurance_type"], dropna=False)
+    df["azure_status"] = df["enrollee_status_description"].fillna(
+        df["enrollment_status_description"]
+    )
+
+    df["join_key"] = (
+        df["issuer"] + "|" +
+        df["policy_id"] + "|" +
+        df["member_id"] + "|" +
+        df["insurance_type"]
+    )
+
+    # create month rows from benefit window Jan-May
+    rows = []
+
+    for year, month in REPORT_MONTHS:
+        start = pd.Timestamp(f"{year}-{month}-01")
+        end = start + pd.offsets.MonthEnd(0)
+
+        active = df[
+            (df["benefit_effective_date"].isna() | (df["benefit_effective_date"] <= end)) &
+            (df["benefit_end_date"].isna() | (df["benefit_end_date"] >= start))
+        ].copy()
+
+        active["report_year"] = year
+        active["report_month"] = month
+        rows.append(active)
+
+    if rows:
+        out = pd.concat(rows, ignore_index=True)
+    else:
+        out = pd.DataFrame()
+
+    return out
+
+
+# =========================
+# RECONCILIATION
+# =========================
+
+def reconcile(xml, azure):
+    xml_report = xml[xml["report_flag"] == True].copy()
+
+    xml_keys = xml_report[[
+        "join_key", "issuer", "year", "month", "policy_id", "member_id",
+        "insurance_type", "xml_status", "benefit_effective_date",
+        "benefit_end_date", "raw_xml_path"
+    ]].rename(columns={
+        "year": "xml_year",
+        "month": "xml_month",
+        "benefit_effective_date": "xml_benefit_effective_date",
+        "benefit_end_date": "xml_benefit_end_date",
+    })
+
+    azure_keys = azure[[
+        "join_key", "issuer", "report_year", "report_month",
+        "policy_id", "member_id", "insurance_type",
+        "azure_status", "enrollment_status_description",
+        "enrollee_status_description",
+        "benefit_effective_date",
+        "benefit_end_date"
+    ]].rename(columns={
+        "report_year": "azure_year",
+        "report_month": "azure_month",
+        "benefit_effective_date": "azure_benefit_effective_date",
+        "benefit_end_date": "azure_benefit_end_date",
+    })
+
+    merged = xml_keys.merge(
+        azure_keys,
+        how="outer",
+        left_on=["join_key", "xml_year", "xml_month"],
+        right_on=["join_key", "azure_year", "azure_month"],
+        suffixes=("_xml", "_azure"),
+        indicator=True
+    )
+
+    def reason(row):
+        if row["_merge"] == "left_only":
+            return "XML_NOT_IN_AZURE_FINAL_TABLE"
+        if row["_merge"] == "right_only":
+            return "AZURE_FINAL_NOT_IN_XML_CURRENT_MONTH"
+        if str(row.get("xml_status", "")).upper() not in str(row.get("azure_status", "")).upper():
+            return "STATUS_DIFFERENCE"
+        return "MATCH"
+
+    merged["reconciliation_result"] = merged.apply(reason, axis=1)
+
+    return merged
+
+
+def summaries(xml, azure, recon):
+    xml_summary = (
+        xml[xml["report_flag"] == True]
+        .groupby(["issuer", "year", "month", "insurance_type", "xml_status"], dropna=False)
         .agg(
-            policy_count=("enrollment_key", "nunique"),
-            subscriber_count=("subscriber_id", "nunique"),
-            event_rows=("member_id", "size"),
-            months_seen=("event_month", lambda x: ", ".join(sorted(set(x.dropna())))),
-            statuses_seen=("status_normalized", lambda x: ", ".join(sorted(set(x.dropna())))),
-            first_event_date=("event_date", "min"),
-            last_event_date=("event_date", "max"),
-            jan_records=("is_focus_month_record", "sum"),
+            xml_rows=("join_key", "size"),
+            xml_enrollment_count=("policy_id", "nunique"),
+            xml_enrollee_count=("member_id", "nunique"),
         )
         .reset_index()
-        .sort_values(["policy_count", "event_rows"], ascending=False)
     )
 
-
-def create_policy_timeline(df):
-    return (
-        df.groupby(
-            ["member_id", "insurance_type", "enrollment_key"],
-            dropna=False
-        )
+    azure_summary = (
+        azure
+        .groupby(["issuer", "report_year", "report_month", "insurance_type", "azure_status"], dropna=False)
         .agg(
-            event_rows=("member_id", "size"),
-            months_seen=("event_month", lambda x: ", ".join(sorted(set(x.dropna())))),
-            statuses_seen=("status_normalized", lambda x: ", ".join(sorted(set(x.dropna())))),
-            first_event_date=("event_date", "min"),
-            last_event_date=("event_date", "max"),
-            benefit_start=("benefit_effective_date", "min"),
-            benefit_end=("benefit_end_date", "max"),
-            subscriber_ids=("subscriber_id", lambda x: ", ".join(sorted(set(x.dropna().astype(str))))),
-            jan_records=("is_focus_month_record", "sum"),
+            azure_rows=("join_key", "size"),
+            azure_enrollment_count=("policy_id", "nunique"),
+            azure_enrollee_count=("member_id", "nunique"),
         )
         .reset_index()
-        .sort_values(["member_id", "first_event_date", "enrollment_key"])
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month",
+            "azure_status": "status"
+        })
     )
 
+    result_summary = (
+        recon.groupby(["reconciliation_result"], dropna=False)
+        .agg(rows=("join_key", "size"))
+        .reset_index()
+        .sort_values("rows", ascending=False)
+    )
 
-def create_possible_superseded(df):
-    multi = create_member_policy_summary(df)
-    multi_members = set(multi[multi["policy_count"] > 1]["member_id"].astype(str))
+    issuer_month_result = (
+        recon.groupby([
+            recon["issuer_xml"].fillna(recon["issuer_azure"]),
+            recon["xml_year"].fillna(recon["azure_year"]),
+            recon["xml_month"].fillna(recon["azure_month"]),
+            "reconciliation_result"
+        ], dropna=False)
+        .agg(rows=("join_key", "size"))
+        .reset_index()
+    )
 
-    return df[df["member_id"].astype(str).isin(multi_members)].copy()
+    issuer_month_result.columns = ["issuer", "year", "month", "reconciliation_result", "rows"]
 
+    return xml_summary, azure_summary, result_summary, issuer_month_result
+
+
+# =========================
+# EXPORT
+# =========================
 
 def write_excel(sheets):
     with pd.ExcelWriter(OUTPUT_EXCEL, engine="openpyxl") as writer:
-        for name, data in sheets.items():
-            data.to_excel(writer, sheet_name=name[:31], index=False)
+        for name, df in sheets.items():
+            df.head(1_048_000).to_excel(writer, sheet_name=name[:31], index=False)
 
-        for sheet_name in writer.book.sheetnames:
-            ws = writer.book[sheet_name]
-            ws.freeze_panes = "A2"
-            ws.auto_filter.ref = ws.dimensions
+    print(f"Created: {OUTPUT_EXCEL.resolve()}")
 
-            for col in ws.columns:
-                width = min(max(len(str(cell.value)) if cell.value else 0 for cell in col) + 2, 45)
-                ws.column_dimensions[col[0].column_letter].width = width
 
+# =========================
+# MAIN
+# =========================
 
 def main():
-    print("Loading 15105 Jan lifecycle investigation data...")
-    raw = load_data()
-    print(f"Rows loaded: {len(raw)}")
+    print("Reading XML SQLite...")
+    xml_raw = read_xml_sqlite()
+    xml = clean_xml(xml_raw)
+    print(f"XML rows: {len(xml)}")
 
-    clean_df = clean(raw)
+    print("Connecting Azure...")
+    engine = get_azure_engine()
 
-    member_summary = create_member_policy_summary(clean_df)
-    policy_timeline = create_policy_timeline(clean_df)
-    superseded_candidates = create_possible_superseded(clean_df)
+    print("Reading Azure Enrollments_PY2026...")
+    azure_raw = read_azure_enrollments(engine)
+    azure = clean_azure(azure_raw)
+    print(f"Azure report rows: {len(azure)}")
+
+    print("Reconciling XML vs Azure final business table...")
+    recon = reconcile(xml, azure)
+
+    xml_summary, azure_summary, result_summary, issuer_month_result = summaries(xml, azure, recon)
+
+    xml_not_azure = recon[recon["reconciliation_result"] == "XML_NOT_IN_AZURE_FINAL_TABLE"]
+    azure_not_xml = recon[recon["reconciliation_result"] == "AZURE_FINAL_NOT_IN_XML_CURRENT_MONTH"]
+    status_diff = recon[recon["reconciliation_result"] == "STATUS_DIFFERENCE"]
 
     write_excel({
-        "Member_Policy_Summary": member_summary,
-        "Policy_Timeline": policy_timeline,
-        "Superseded_Candidates": superseded_candidates,
-        "Investigation_Raw": clean_df,
+        "Final_Result_Summary": result_summary,
+        "Issuer_Month_Result": issuer_month_result,
+        "XML_Summary": xml_summary,
+        "Azure_Final_Summary": azure_summary,
+        "XML_Not_In_Azure": xml_not_azure,
+        "Azure_Not_In_XML": azure_not_xml,
+        "Status_Difference": status_diff,
+        "Full_Reconciliation": recon,
     })
 
-    print("\nDone cicim:")
-    print(OUTPUT_EXCEL.resolve())
+    print("Done cicim.")
 
 
 if __name__ == "__main__":
