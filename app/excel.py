@@ -1,517 +1,519 @@
-import os
-import re
-import glob
-import xml.etree.ElementTree as ET
+import sqlite3
+import urllib.parse
 from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
 
 
-# =========================
-# CONFIG
-# =========================
+# =====================================================
+# CONFIGURATION
+# =====================================================
 
-load_dotenv()
-
-AZURE_CONN_STR = os.getenv("AZURE_SQL_CONNECTION_STRING")
-
-XML_ROOT_DIR = r"C:\Users\SelmaKazanci\Downloads\gaaccess-develop6\gaaccess-develop6\xml_files"
-OUTPUT_FILE = r"C:\Users\SelmaKazanci\Downloads\db_xml_834_comparison.xlsx"
-
+YEAR = 2026
 START_DATE = "2026-01-01"
-END_DATE = "2026-06-01"   # Jan-May için June 1 exclusive
+END_DATE = "2026-06-01"   # Jan-May, June 1 exclusive
 
-DB_TABLE = "dbo.[834_Inbound_test]"
+SQLITE_DB_PATH = Path("data/issuer_834.db")
+
+OUTPUT_DIR = Path("query_outputs")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+OUTPUT_EXCEL = OUTPUT_DIR / "final_db_vs_xml_834_comparison_2026_jan_may.xlsx"
 
 
-# =========================
-# HELPERS
-# =========================
+# =====================================================
+# AZURE SQL CONNECTION - KEEP THIS STYLE
+# =====================================================
+
+SERVER = "ga......"       # Data Source
+DATABASE = "ga......"     # Initial Catalog
+USERNAME = "sk..."        # User ID
+DRIVER = "ODBC Driver 18 for SQL Server"
+
+
+def get_azure_engine():
+    conn_str = (
+        f"DRIVER={{{DRIVER}}};"
+        f"SERVER={SERVER};"
+        f"DATABASE={DATABASE};"
+        f"UID={USERNAME};"
+        f"Authentication=ActiveDirectoryInteractive;"
+        f"Encrypt=yes;"
+        f"TrustServerCertificate=no;"
+        f"Connection Timeout=30;"
+    )
+
+    params = urllib.parse.quote_plus(conn_str)
+    return create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
+
+
+def read_azure(engine, sql):
+    with engine.connect() as conn:
+        return pd.read_sql_query(text(sql), conn)
+
+
+# =====================================================
+# AZURE DB 834 RAW DATA
+# =====================================================
+
+def get_db_834_raw(engine):
+    sql = f"""
+    SELECT
+        Coverage_Year AS year,
+        GAA_HIOS_ID AS issuer,
+        GAA_Load_Date AS load_date,
+        GAA_834_File_Name AS file_name,
+        GAA_834_File_Date AS file_date,
+
+        exchgAssignedPolicyID AS policy_id,
+        exchgIndivIdentifier AS member_id,
+        exchgSubscriberIdentifier AS subscriber_id,
+        householdOrEmployeeCaseID AS household_id,
+
+        previousExchgAssignedPolicyID AS previous_policy_id,
+        healthCoveragePolicyID AS health_coverage_policy_id,
+
+        Insurance_Type AS insurance_type,
+        planCoverageDescription AS plan_coverage_description,
+
+        enrolleeStatus AS status,
+        enrolleeStatusDate AS status_date,
+
+        actionCode AS action_code,
+        actionCode_desc AS action_code_desc,
+
+        event_type_code,
+        event_type_code_desc,
+        event_reason_code,
+        event_reason_code_desc,
+
+        subscriberFlag AS subscriber_flag,
+        member_relationship AS relationship,
+
+        memberFirstName AS first_name,
+        memberMiddleName AS middle_name,
+        memberLastName AS last_name,
+        memberBirthDate AS birth_date,
+        memberGender AS gender,
+        memberSSN AS ssn,
+
+        benefitEffectiveBeginDate AS benefit_effective_date,
+        benefitEffectiveEndDate AS benefit_end_date,
+        memberEligibilityBeginDate AS eligibility_begin_date,
+        memberEligibilityEndDate AS eligibility_end_date,
+        memberMaintEffectiveDate AS member_maint_effective_date,
+
+        healthCoveragePremiumAmt AS premium_amount,
+        totalIndivResponsibilityAmt AS responsibility_amount,
+        aptcAmt AS aptc_amount,
+        csrAmt AS csr_amount,
+        totalPremiumAmt AS total_premium_amount,
+
+        renewalStatus AS renewal_status,
+        sepReason AS sep_reason,
+        qleReason AS qle_reason,
+
+        homeCity AS home_city,
+        homeCounty AS home_county,
+        homeState AS home_state,
+        homeZip AS home_zip
+    FROM dbo.[834_Inbound_test]
+    WHERE Coverage_Year = {YEAR}
+      AND GAA_834_File_Date >= '{START_DATE}'
+      AND GAA_834_File_Date < '{END_DATE}'
+      AND enrolleeStatus IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
+    """
+
+    return read_azure(engine, sql)
+
+
+def get_db_header_summary(engine):
+    sql = f"""
+    SELECT
+        GAA_HIOS_ID AS issuer,
+        GAA_Load_Date AS load_date,
+        GAA_834_File_Name AS file_name,
+        GAA_834_File_Date AS file_date,
+        record_count,
+        enrollment_count,
+        enrollee_count,
+        confirm_count,
+        cancel_count,
+        term_count
+    FROM dbo.[834_Inbound_header_test]
+    WHERE GAA_834_File_Date >= '{START_DATE}'
+      AND GAA_834_File_Date < '{END_DATE}'
+    """
+
+    return read_azure(engine, sql)
+
+
+# =====================================================
+# XML / SQLITE DATA
+# =====================================================
+
+def get_xml_raw():
+    if not SQLITE_DB_PATH.exists():
+        raise FileNotFoundError(f"SQLite DB not found: {SQLITE_DB_PATH.resolve()}")
+
+    conn = sqlite3.connect(SQLITE_DB_PATH)
+
+    sql = f"""
+    SELECT
+        year,
+        issuer,
+        month,
+        raw_xml_path AS file_name,
+
+        policy_id,
+        member_id,
+        subscriber_id,
+        household_or_employee_case_id AS household_id,
+
+        insurance_type_code,
+        additional_maint_reason_code,
+
+        subscriber_flag,
+        relationship,
+
+        benefit_effective_date,
+        benefit_end_date,
+        member_maint_effective_date,
+
+        first_name,
+        last_name,
+        birth_date
+    FROM stg_834_records
+    WHERE year = '{YEAR}'
+      AND month IN ('01','02','03','04','05')
+      AND additional_maint_reason_code IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
+    """
+
+    df = pd.read_sql_query(sql, conn)
+    conn.close()
+    return df
+
+
+# =====================================================
+# CLEANUP
+# =====================================================
 
 def normalize_status(value):
     if pd.isna(value):
-        return "UNKNOWN"
+        return None
 
-    v = str(value).strip().upper()
+    value = str(value).strip().upper()
 
-    if v in ["021", "CONFIRM", "CONFIRMED", "ENROLLED", "ACTIVE"]:
+    if value == "REINSTATE":
         return "CONFIRM"
 
-    if v in ["024", "TERM", "TERMINATED", "TERMINATE"]:
-        return "TERM"
-
-    if v in ["001", "CANCEL", "CANCELLED", "CANCELED"]:
-        return "CANCEL"
-
-    return v
+    return value
 
 
-def normalize_insurance_type(value):
+def normalize_db_insurance_type(value):
     if pd.isna(value):
-        return "UNKNOWN"
+        return "Unknown"
 
-    v = str(value).strip().upper()
+    value = str(value).strip()
 
-    if "DENTAL" in v:
+    if value.upper() == "DENTAL":
         return "Dental"
-    if "HEALTH" in v or "QHP" in v:
+
+    if value.upper() == "HEALTH":
         return "Health"
 
-    return str(value).strip()
+    return value
 
 
-def month2(value):
-    return str(value).zfill(2)
+def normalize_xml_insurance_type(value):
+    if pd.isna(value):
+        return "Unknown"
+
+    value = str(value).strip().upper()
+
+    if value == "DEN":
+        return "Dental"
+
+    return "Health"
 
 
-# =========================
-# DB EXTRACT
-# =========================
+def clean_db_834(df):
+    clean = df.copy()
 
-def get_engine():
-    if not AZURE_CONN_STR:
-        raise ValueError("AZURE_SQL_CONNECTION_STRING is missing in .env")
+    clean["source"] = "AZURE_DB"
+    clean["issuer"] = clean["issuer"].astype(str)
+    clean["year"] = clean["year"].astype(str)
+    clean["month"] = pd.to_datetime(clean["file_date"], errors="coerce").dt.strftime("%m")
 
-    return create_engine(AZURE_CONN_STR, fast_executemany=True)
+    clean["status"] = clean["status"].apply(normalize_status)
+    clean["insurance_type"] = clean["insurance_type"].apply(normalize_db_insurance_type)
 
+    clean["policy_id"] = clean["policy_id"].astype(str)
+    clean["member_id"] = clean["member_id"].astype(str)
+    clean["subscriber_id"] = clean["subscriber_id"].astype(str)
 
-def extract_db_raw(engine):
-    sql = f"""
-        SELECT
-            Coverage_Year AS year,
-            GAA_HIOS_ID AS issuer,
-            TRY_CONVERT(date, GAA_834_File_Date) AS file_date,
-            GAA_834_File_Name AS file_name,
+    clean["enrollment_key"] = clean["policy_id"]
 
-            Insurance_Type AS insurance_type,
-
-            actionCode AS action_code,
-            actionCode_desc AS action_desc,
-
-            event_type_code AS event_type_code,
-            event_type_code_desc AS event_type_desc,
-            event_reason_code AS event_reason_code,
-            event_reason_code_desc AS event_reason_desc,
-
-            exchgAssignedPolicyID AS policy_id,
-            exchgIndivIdentifier AS member_id,
-            exchgSubscriberIdentifier AS subscriber_id,
-
-            householdOrEmployeeCaseID AS household_id,
-            healthCoveragePolicyID AS health_policy_id,
-
-            enrolleeStatus AS enrollee_status,
-            enrolleeStatusDate AS enrollee_status_date,
-
-            subscriberFlag AS subscriber_flag,
-
-            memberFirstName AS first_name,
-            memberLastName AS last_name,
-            memberBirthDate AS birth_date,
-
-            benefitEffectiveBeginDate AS benefit_begin_date,
-            benefitEffectiveEndDate AS benefit_end_date,
-            memberEligibilityBeginDate AS eligibility_begin_date,
-            memberEligibilityEndDate AS eligibility_end_date,
-            memberMaintEffectiveDate AS maint_effective_date,
-
-            healthCoveragePremiumAmt AS premium_amt,
-            totalIndivResponsibilityAmt AS responsibility_amt,
-            aptcAmt AS aptc_amt,
-            csrAmt AS csr_amt,
-            totalPremiumAmt AS total_premium_amt
-
-        FROM {DB_TABLE}
-        WHERE TRY_CONVERT(date, GAA_834_File_Date) >= :start_date
-          AND TRY_CONVERT(date, GAA_834_File_Date) < :end_date
-    """
-
-    with engine.connect() as conn:
-        df = pd.read_sql_query(
-            text(sql),
-            conn,
-            params={"start_date": START_DATE, "end_date": END_DATE}
-        )
-
-    df["source"] = "AZURE_DB"
-    df["month"] = pd.to_datetime(df["file_date"], errors="coerce").dt.month.astype("Int64").astype(str).str.zfill(2)
-    df["status"] = df["action_desc"].combine_first(df["enrollee_status"]).apply(normalize_status)
-    df["insurance_type"] = df["insurance_type"].apply(normalize_insurance_type)
-
-    return df
+    return clean
 
 
-def summarize_db(df):
-    return (
-        df.groupby(["issuer", "year", "month", "insurance_type", "status"], dropna=False)
-        .agg(
-            db_raw_row_count=("policy_id", "size"),
-            db_policy_count=("policy_id", pd.Series.nunique),
-            db_member_count=("member_id", pd.Series.nunique),
-            db_subscriber_count=("subscriber_id", pd.Series.nunique),
-            db_household_count=("household_id", pd.Series.nunique),
-        )
-        .reset_index()
-    )
+def clean_xml(df):
+    clean = df.copy()
 
+    clean["source"] = "XML_SQLITE"
+    clean["issuer"] = clean["issuer"].astype(str)
+    clean["year"] = clean["year"].astype(str)
+    clean["month"] = clean["month"].astype(str).str.zfill(2)
 
-# =========================
-# XML EXTRACT
-# =========================
+    clean["status"] = clean["additional_maint_reason_code"].apply(normalize_status)
+    clean["insurance_type"] = clean["insurance_type_code"].apply(normalize_xml_insurance_type)
 
-def clean_xml_text(x):
-    if x is None:
+    clean["policy_id"] = clean["policy_id"].astype(str)
+    clean["member_id"] = clean["member_id"].astype(str)
+    clean["subscriber_id"] = clean["subscriber_id"].astype(str)
+
+    def enrollment_key(row):
+        for col in ["policy_id", "subscriber_id", "household_id"]:
+            val = row.get(col)
+            if pd.notna(val) and str(val).strip() not in ["", "None", "nan"]:
+                return str(val)
         return None
-    return str(x).strip()
+
+    clean["enrollment_key"] = clean.apply(enrollment_key, axis=1)
+
+    return clean
 
 
-def find_text_anywhere(root, possible_names):
-    possible_names_lower = [x.lower() for x in possible_names]
+# =====================================================
+# SUMMARIES
+# =====================================================
 
-    for elem in root.iter():
-        tag = elem.tag.split("}")[-1].lower()
-        if tag in possible_names_lower:
-            return clean_xml_text(elem.text)
-
-    return None
-
-
-def parse_one_xml(file_path):
-    file_path = Path(file_path)
-
-    try:
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-    except Exception:
-        return []
-
-    file_name = file_path.name
-
-    issuer = find_text_anywhere(
-        root,
-        [
-            "GAA_HIOS_ID",
-            "hiosIssuerId",
-            "hios_issuer_id",
-            "issuerId",
-            "HIOSID",
-            "issuer"
-        ]
-    )
-
-    coverage_year = find_text_anywhere(
-        root,
-        [
-            "Coverage_Year",
-            "coverageYear",
-            "coverage_year"
-        ]
-    )
-
-    insurance_type = find_text_anywhere(
-        root,
-        [
-            "Insurance_Type",
-            "insuranceType",
-            "insurance_type",
-            "planCoverageDescription"
-        ]
-    )
-
-    file_date_match = re.search(r"(20\d{2})[-_]?([01]\d)[-_]?([0-3]\d)", file_name)
-    file_date = None
-    month = None
-
-    if file_date_match:
-        y, m, d = file_date_match.groups()
-        file_date = f"{y}-{m}-{d}"
-        month = m
-
-    records = []
-
-    for elem in root.iter():
-        tag = elem.tag.split("}")[-1].lower()
-
-        # Broad member/enrollee/policy-ish nodes
-        if tag in [
-            "member",
-            "enrollee",
-            "subscriber",
-            "policy",
-            "coverage",
-            "loop2000",
-            "loop2300"
-        ]:
-            policy_id = find_text_anywhere(
-                elem,
-                [
-                    "exchgAssignedPolicyID",
-                    "policyId",
-                    "policy_id",
-                    "healthCoveragePolicyID"
-                ]
-            )
-
-            member_id = find_text_anywhere(
-                elem,
-                [
-                    "exchgIndivIdentifier",
-                    "memberId",
-                    "member_id",
-                    "enrolleeId"
-                ]
-            )
-
-            subscriber_id = find_text_anywhere(
-                elem,
-                [
-                    "exchgSubscriberIdentifier",
-                    "subscriberId",
-                    "subscriber_id"
-                ]
-            )
-
-            household_id = find_text_anywhere(
-                elem,
-                [
-                    "householdOrEmployeeCaseID",
-                    "householdId",
-                    "household_id"
-                ]
-            )
-
-            status = find_text_anywhere(
-                elem,
-                [
-                    "actionCode_desc",
-                    "actionCode",
-                    "enrolleeStatus",
-                    "status",
-                    "maintenanceTypeCode"
-                ]
-            )
-
-            if policy_id or member_id or subscriber_id or status:
-                records.append(
-                    {
-                        "source": "XML",
-                        "file_name": file_name,
-                        "file_path": str(file_path),
-                        "file_date": file_date,
-                        "issuer": issuer,
-                        "year": coverage_year,
-                        "month": month,
-                        "insurance_type": normalize_insurance_type(insurance_type),
-                        "status": normalize_status(status),
-                        "policy_id": policy_id,
-                        "member_id": member_id,
-                        "subscriber_id": subscriber_id,
-                        "household_id": household_id,
-                    }
-                )
-
-    # fallback: if no child records found, create file-level row
-    if not records:
-        records.append(
-            {
-                "source": "XML",
-                "file_name": file_name,
-                "file_path": str(file_path),
-                "file_date": file_date,
-                "issuer": issuer,
-                "year": coverage_year,
-                "month": month,
-                "insurance_type": normalize_insurance_type(insurance_type),
-                "status": "UNKNOWN",
-                "policy_id": None,
-                "member_id": None,
-                "subscriber_id": None,
-                "household_id": None,
+def summarize_records(df, prefix):
+    return (
+        df.groupby(
+            ["issuer", "year", "month", "insurance_type", "status"],
+            dropna=False
+        )
+        .agg(
+            **{
+                f"{prefix}_raw_rows": ("member_id", "size"),
+                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
+                f"{prefix}_enrollee_count": ("member_id", "nunique"),
+                f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
+                f"{prefix}_file_count": ("file_name", "nunique"),
             }
         )
-
-    return records
-
-
-def extract_xml_raw():
-    patterns = [
-        "**/*.xml",
-        "**/*.XML",
-    ]
-
-    files = []
-    for pattern in patterns:
-        files.extend(glob.glob(str(Path(XML_ROOT_DIR) / pattern), recursive=True))
-
-    all_rows = []
-
-    for file in files:
-        all_rows.extend(parse_one_xml(file))
-
-    df = pd.DataFrame(all_rows)
-
-    if df.empty:
-        return pd.DataFrame(
-            columns=[
-                "source", "file_name", "file_path", "file_date", "issuer",
-                "year", "month", "insurance_type", "status",
-                "policy_id", "member_id", "subscriber_id", "household_id"
-            ]
-        )
-
-    df["issuer"] = df["issuer"].astype(str).str.extract(r"(\d+)")[0]
-    df["year"] = df["year"].astype(str).str.extract(r"(20\d{2})")[0]
-    df["month"] = df["month"].apply(lambda x: month2(x) if pd.notna(x) else x)
-
-    return df
+        .reset_index()
+    )
 
 
-def summarize_xml(df):
-    if df.empty:
-        return pd.DataFrame()
-
+def summarize_by_issuer_month(df, prefix):
     return (
-        df.groupby(["issuer", "year", "month", "insurance_type", "status"], dropna=False)
+        df.groupby(
+            ["issuer", "year", "month"],
+            dropna=False
+        )
         .agg(
-            xml_raw_row_count=("policy_id", "size"),
-            xml_policy_count=("policy_id", pd.Series.nunique),
-            xml_member_count=("member_id", pd.Series.nunique),
-            xml_subscriber_count=("subscriber_id", pd.Series.nunique),
-            xml_household_count=("household_id", pd.Series.nunique),
+            **{
+                f"{prefix}_raw_rows": ("member_id", "size"),
+                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
+                f"{prefix}_enrollee_count": ("member_id", "nunique"),
+                f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
+                f"{prefix}_file_count": ("file_name", "nunique"),
+            }
         )
         .reset_index()
     )
 
 
-# =========================
-# COMPARISON
-# =========================
-
-def compare_summaries(db_summary, xml_summary):
-    keys = ["issuer", "year", "month", "insurance_type", "status"]
-
-    comparison = db_summary.merge(
-        xml_summary,
-        on=keys,
-        how="outer"
+def summarize_by_file(df, prefix):
+    return (
+        df.groupby(
+            ["issuer", "year", "month", "file_name"],
+            dropna=False
+        )
+        .agg(
+            **{
+                f"{prefix}_raw_rows": ("member_id", "size"),
+                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
+                f"{prefix}_enrollee_count": ("member_id", "nunique"),
+                f"{prefix}_confirm_count": ("status", lambda x: (x == "CONFIRM").sum()),
+                f"{prefix}_cancel_count": ("status", lambda x: (x == "CANCEL").sum()),
+                f"{prefix}_term_count": ("status", lambda x: (x == "TERM").sum()),
+            }
+        )
+        .reset_index()
     )
 
-    count_cols = [
-        "db_raw_row_count",
-        "db_policy_count",
-        "db_member_count",
-        "db_subscriber_count",
-        "db_household_count",
-        "xml_raw_row_count",
-        "xml_policy_count",
-        "xml_member_count",
-        "xml_subscriber_count",
-        "xml_household_count",
+
+# =====================================================
+# COMPARISON
+# =====================================================
+
+def compare_status_summary(db_summary, xml_summary):
+    comparison = pd.merge(
+        db_summary,
+        xml_summary,
+        how="outer",
+        on=["issuer", "year", "month", "insurance_type", "status"]
+    )
+
+    numeric_cols = [
+        "db_raw_rows", "db_enrollment_count", "db_enrollee_count",
+        "db_subscriber_count", "db_file_count",
+        "xml_raw_rows", "xml_enrollment_count", "xml_enrollee_count",
+        "xml_subscriber_count", "xml_file_count",
     ]
 
-    for col in count_cols:
-        if col not in comparison.columns:
-            comparison[col] = 0
-        comparison[col] = comparison[col].fillna(0).astype(int)
+    for col in numeric_cols:
+        if col in comparison.columns:
+            comparison[col] = comparison[col].fillna(0).astype(int)
 
-    comparison["raw_row_diff"] = comparison["db_raw_row_count"] - comparison["xml_raw_row_count"]
-    comparison["policy_diff"] = comparison["db_policy_count"] - comparison["xml_policy_count"]
-    comparison["member_diff"] = comparison["db_member_count"] - comparison["xml_member_count"]
+    comparison["raw_row_diff"] = comparison["db_raw_rows"] - comparison["xml_raw_rows"]
+    comparison["enrollment_diff"] = comparison["db_enrollment_count"] - comparison["xml_enrollment_count"]
+    comparison["enrollee_diff"] = comparison["db_enrollee_count"] - comparison["xml_enrollee_count"]
     comparison["subscriber_diff"] = comparison["db_subscriber_count"] - comparison["xml_subscriber_count"]
-    comparison["household_diff"] = comparison["db_household_count"] - comparison["xml_household_count"]
+    comparison["file_count_diff"] = comparison["db_file_count"] - comparison["xml_file_count"]
 
-    comparison["comparison_status"] = comparison.apply(
+    comparison["match_status"] = comparison.apply(
         lambda r: "MATCH"
         if r["raw_row_diff"] == 0
-        and r["policy_diff"] == 0
-        and r["member_diff"] == 0
+        and r["enrollment_diff"] == 0
+        and r["enrollee_diff"] == 0
         and r["subscriber_diff"] == 0
-        and r["household_diff"] == 0
         else "MISMATCH",
         axis=1
     )
 
-    return comparison.sort_values(keys)
+    return comparison.sort_values(
+        ["match_status", "issuer", "year", "month", "insurance_type", "status"]
+    )
 
 
-def issuer_coverage(db_summary, xml_summary):
-    db_issuers = set(db_summary["issuer"].dropna().astype(str))
-    xml_issuers = set(xml_summary["issuer"].dropna().astype(str))
+def compare_issuer_month(db_month, xml_month):
+    comparison = pd.merge(
+        db_month,
+        xml_month,
+        how="outer",
+        on=["issuer", "year", "month"]
+    )
 
-    rows = []
+    numeric_cols = [
+        "db_raw_rows", "db_enrollment_count", "db_enrollee_count",
+        "db_subscriber_count", "db_file_count",
+        "xml_raw_rows", "xml_enrollment_count", "xml_enrollee_count",
+        "xml_subscriber_count", "xml_file_count",
+    ]
 
-    for issuer in sorted(db_issuers | xml_issuers):
-        rows.append(
-            {
-                "issuer": issuer,
-                "in_db": issuer in db_issuers,
-                "in_xml": issuer in xml_issuers,
-                "coverage_status": (
-                    "BOTH"
-                    if issuer in db_issuers and issuer in xml_issuers
-                    else "DB_ONLY"
-                    if issuer in db_issuers
-                    else "XML_ONLY"
-                )
-            }
-        )
+    for col in numeric_cols:
+        if col in comparison.columns:
+            comparison[col] = comparison[col].fillna(0).astype(int)
 
-    return pd.DataFrame(rows)
+    comparison["raw_row_diff"] = comparison["db_raw_rows"] - comparison["xml_raw_rows"]
+    comparison["enrollment_diff"] = comparison["db_enrollment_count"] - comparison["xml_enrollment_count"]
+    comparison["enrollee_diff"] = comparison["db_enrollee_count"] - comparison["xml_enrollee_count"]
+    comparison["subscriber_diff"] = comparison["db_subscriber_count"] - comparison["xml_subscriber_count"]
+    comparison["file_count_diff"] = comparison["db_file_count"] - comparison["xml_file_count"]
 
+    comparison["match_status"] = comparison.apply(
+        lambda r: "MATCH"
+        if r["raw_row_diff"] == 0
+        and r["enrollment_diff"] == 0
+        and r["enrollee_diff"] == 0
+        else "MISMATCH",
+        axis=1
+    )
 
-# =========================
-# EXPORT
-# =========================
-
-def write_excel(db_raw, xml_raw, db_summary, xml_summary, comparison, issuer_cov):
-    with pd.ExcelWriter(OUTPUT_FILE, engine="openpyxl") as writer:
-        comparison.to_excel(writer, sheet_name="DB_vs_XML_Comparison", index=False)
-        db_summary.to_excel(writer, sheet_name="Azure_Summary", index=False)
-        xml_summary.to_excel(writer, sheet_name="XML_Summary", index=False)
-        issuer_cov.to_excel(writer, sheet_name="Issuer_Coverage", index=False)
-
-        db_raw.head(100000).to_excel(writer, sheet_name="Azure_Raw_Sample", index=False)
-        xml_raw.head(100000).to_excel(writer, sheet_name="XML_Raw_Sample", index=False)
-
-    print(f"Excel created successfully: {OUTPUT_FILE}")
+    return comparison.sort_values(["match_status", "issuer", "year", "month"])
 
 
-# =========================
+# =====================================================
+# EXCEL WRITER
+# =====================================================
+
+def write_excel(path, sheets):
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            safe_name = sheet_name[:31]
+
+            if len(df) > 1_048_000:
+                df.head(1_048_000).to_excel(writer, sheet_name=safe_name, index=False)
+            else:
+                df.to_excel(writer, sheet_name=safe_name, index=False)
+
+        for sheet_name in writer.book.sheetnames:
+            ws = writer.book[sheet_name]
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+
+            for col in ws.columns:
+                max_len = 0
+                col_letter = col[0].column_letter
+
+                for cell in col:
+                    value = "" if cell.value is None else str(cell.value)
+                    max_len = max(max_len, len(value))
+
+                ws.column_dimensions[col_letter].width = min(max_len + 2, 45)
+
+
+# =====================================================
 # MAIN
-# =========================
+# =====================================================
 
 def main():
-    print("Connecting Azure...")
-    engine = get_engine()
+    print("Connecting to Azure...")
+    engine = get_azure_engine()
 
-    print("Extracting Azure DB 834 data...")
-    db_raw = extract_db_raw(engine)
-    print(f"DB raw rows: {len(db_raw)}")
+    print("Reading Azure 834 raw data...")
+    db_raw = get_db_834_raw(engine)
+    print(f"Azure raw rows: {len(db_raw)}")
 
-    print("Summarizing Azure DB...")
-    db_summary = summarize_db(db_raw)
-    print(f"DB summary rows: {len(db_summary)}")
+    print("Reading Azure 834 header summary...")
+    db_header = get_db_header_summary(engine)
+    print(f"Azure header rows: {len(db_header)}")
 
-    print("Extracting XML data...")
-    xml_raw = extract_xml_raw()
+    print("Reading XML / SQLite data...")
+    xml_raw = get_xml_raw()
     print(f"XML raw rows: {len(xml_raw)}")
 
-    print("Summarizing XML...")
-    xml_summary = summarize_xml(xml_raw)
-    print(f"XML summary rows: {len(xml_summary)}")
+    print("Cleaning data...")
+    db_clean = clean_db_834(db_raw)
+    xml_clean = clean_xml(xml_raw)
 
-    print("Comparing DB vs XML...")
-    comparison = compare_summaries(db_summary, xml_summary)
+    print("Creating summaries...")
+    db_summary = summarize_records(db_clean, "db")
+    xml_summary = summarize_records(xml_clean, "xml")
 
-    print("Checking issuer coverage...")
-    issuer_cov = issuer_coverage(db_summary, xml_summary)
+    db_month = summarize_by_issuer_month(db_clean, "db")
+    xml_month = summarize_by_issuer_month(xml_clean, "xml")
 
-    print("Writing Excel...")
-    write_excel(db_raw, xml_raw, db_summary, xml_summary, comparison, issuer_cov)
+    db_file_summary = summarize_by_file(db_clean, "db")
+    xml_file_summary = summarize_by_file(xml_clean, "xml")
 
-    print("Done.")
+    print("Creating comparisons...")
+    status_comparison = compare_status_summary(db_summary, xml_summary)
+    issuer_month_comparison = compare_issuer_month(db_month, xml_month)
+
+    print("Writing Excel report...")
+    write_excel(
+        OUTPUT_EXCEL,
+        {
+            "Issuer_Month_Comparison": issuer_month_comparison,
+            "DB_vs_XML_Status": status_comparison,
+            "DB_Summary": db_summary,
+            "XML_Summary": xml_summary,
+            "DB_File_Summary": db_file_summary,
+            "XML_File_Summary": xml_file_summary,
+            "DB_Header_Summary": db_header,
+            "DB_834_Raw": db_raw,
+            "XML_Raw": xml_raw,
+        }
+    )
+
+    print("\nDone cicim:")
+    print(OUTPUT_EXCEL.resolve())
 
 
 if __name__ == "__main__":
