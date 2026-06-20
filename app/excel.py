@@ -3,53 +3,88 @@ from pathlib import Path
 import pandas as pd
 
 
-SQLITE_DB_PATH = Path("data/issuer_834.db")
-
+DB_PATH = Path("data/issuer_834.db")
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-OUTPUT_EXCEL = OUTPUT_DIR / "monthly_event_with_lookback_engine_jan_may_2026.xlsx"
+OUTPUT_EXCEL = OUTPUT_DIR / "investigate_15105_jan_2026_lifecycle.xlsx"
+
+ISSUER = "15105"
+FOCUS_YEAR = "2026"
+FOCUS_MONTH = "01"
 
 HISTORY_MONTHS = [
-    ("2025", "10"), ("2025", "11"), ("2025", "12"),
-    ("2026", "01"), ("2026", "02"), ("2026", "03"), ("2026", "04"), ("2026", "05"),
-]
-
-REPORT_MONTHS = [
+    ("2025", "10"),
+    ("2025", "11"),
+    ("2025", "12"),
     ("2026", "01"),
-    ("2026", "02"),
-    ("2026", "03"),
-    ("2026", "04"),
-    ("2026", "05"),
 ]
 
 
-def read_events():
-    where_sql = " OR ".join([f"(year='{y}' AND month='{m}')" for y, m in HISTORY_MONTHS])
+def get_columns(conn, table="stg_834_records"):
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cur.fetchall()]
+
+
+def col_expr(columns, col_name, alias=None):
+    alias = alias or col_name
+    if col_name in columns:
+        return f"{col_name} AS {alias}"
+    return f"NULL AS {alias}"
+
+
+def load_data():
+    conn = sqlite3.connect(DB_PATH)
+    columns = get_columns(conn)
+
+    select_cols = [
+        col_expr(columns, "issuer"),
+        col_expr(columns, "year"),
+        col_expr(columns, "month"),
+        col_expr(columns, "policy_id"),
+        col_expr(columns, "member_id"),
+        col_expr(columns, "subscriber_id"),
+        col_expr(columns, "household_or_employee_case_id", "household_id"),
+        col_expr(columns, "insurance_type_code"),
+        col_expr(columns, "additional_maint_reason_code", "status"),
+        col_expr(columns, "maintenance_type_code"),
+        col_expr(columns, "enrollee_event_type_code"),
+        col_expr(columns, "enrollee_event_reason_code"),
+        col_expr(columns, "subscriber_flag"),
+        col_expr(columns, "relationship"),
+        col_expr(columns, "benefit_effective_date"),
+        col_expr(columns, "benefit_end_date"),
+        col_expr(columns, "member_maint_effective_date"),
+        col_expr(columns, "raw_xml_path"),
+        col_expr(columns, "previousExchgAssignedPolicyID", "previous_policy_id"),
+        col_expr(columns, "previous_exchg_assigned_policy_id", "previous_policy_id_alt"),
+        col_expr(columns, "renewalStatus", "renewal_status"),
+        col_expr(columns, "renewal_status", "renewal_status_alt"),
+    ]
+
+    history_where = " OR ".join(
+        [f"(year='{y}' AND month='{m}')" for y, m in HISTORY_MONTHS]
+    )
 
     sql = f"""
+    WITH focus_members AS (
+        SELECT DISTINCT member_id
+        FROM stg_834_records
+        WHERE issuer = '{ISSUER}'
+          AND year = '{FOCUS_YEAR}'
+          AND month = '{FOCUS_MONTH}'
+          AND additional_maint_reason_code IN ('CONFIRM','REINSTATE','CANCEL','TERM')
+    )
     SELECT
-        issuer,
-        year,
-        month,
-        policy_id,
-        member_id,
-        subscriber_id,
-        household_or_employee_case_id AS household_id,
-        insurance_type_code,
-        additional_maint_reason_code,
-        subscriber_flag,
-        relationship,
-        benefit_effective_date,
-        benefit_end_date,
-        member_maint_effective_date,
-        raw_xml_path
+        {", ".join(select_cols)}
     FROM stg_834_records
-    WHERE ({where_sql})
-      AND additional_maint_reason_code IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
+    WHERE issuer = '{ISSUER}'
+      AND ({history_where})
+      AND member_id IN (SELECT member_id FROM focus_members)
+      AND additional_maint_reason_code IN ('CONFIRM','REINSTATE','CANCEL','TERM')
     """
 
-    conn = sqlite3.connect(SQLITE_DB_PATH)
     df = pd.read_sql_query(sql, conn)
     conn.close()
     return df
@@ -58,27 +93,15 @@ def read_events():
 def clean(df):
     df = df.copy()
 
-    df["issuer"] = df["issuer"].astype(str)
-    df["year"] = df["year"].astype(str)
-    df["month"] = df["month"].astype(str).str.zfill(2)
-
-    df["status"] = df["additional_maint_reason_code"].replace({"REINSTATE": "CONFIRM"})
-
+    df["status_normalized"] = df["status"].replace({"REINSTATE": "CONFIRM"})
     df["insurance_type"] = df["insurance_type_code"].apply(
         lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
     )
 
-    for col in ["policy_id", "member_id", "subscriber_id", "household_id"]:
-        df[col] = df[col].astype(str).replace(["None", "nan", "NaN", ""], pd.NA)
+    for c in ["policy_id", "member_id", "subscriber_id", "household_id"]:
+        df[c] = df[c].astype(str).replace(["None", "nan", "NaN", ""], pd.NA)
 
     df["enrollment_key"] = df["policy_id"].fillna(df["subscriber_id"]).fillna(df["household_id"])
-
-    df["entity_key"] = (
-        df["issuer"].astype(str) + "|" +
-        df["insurance_type"].astype(str) + "|" +
-        df["enrollment_key"].astype(str) + "|" +
-        df["member_id"].astype(str)
-    )
 
     df["person_key"] = (
         df["issuer"].astype(str) + "|" +
@@ -86,312 +109,112 @@ def clean(df):
         df["member_id"].astype(str)
     )
 
+    df["entity_key"] = (
+        df["person_key"] + "|" +
+        df["enrollment_key"].astype(str)
+    )
+
     df["benefit_effective_date"] = pd.to_datetime(df["benefit_effective_date"], errors="coerce")
     df["benefit_end_date"] = pd.to_datetime(df["benefit_end_date"], errors="coerce")
     df["member_maint_effective_date"] = pd.to_datetime(df["member_maint_effective_date"], errors="coerce")
 
-    df["file_month_date"] = pd.to_datetime(df["year"] + "-" + df["month"] + "-01", errors="coerce")
+    df["event_month"] = df["year"].astype(str) + "-" + df["month"].astype(str).str.zfill(2)
 
     df["event_date"] = (
         df["member_maint_effective_date"]
         .fillna(df["benefit_effective_date"])
-        .fillna(df["file_month_date"])
+        .fillna(pd.to_datetime(df["event_month"] + "-01", errors="coerce"))
     )
 
-    df["status_rank"] = df["status"].map({
-        "CONFIRM": 4,
-        "CANCEL": 3,
-        "TERM": 2
-    }).fillna(1)
+    df["is_focus_month_record"] = (
+        (df["year"] == FOCUS_YEAR) &
+        (df["month"] == FOCUS_MONTH)
+    )
 
-    return df
-
-
-def month_bounds(year, month):
-    start = pd.Timestamp(f"{year}-{month}-01")
-    end = start + pd.offsets.MonthEnd(0)
-    return start, end
+    return df.sort_values(
+        ["member_id", "policy_id", "event_date", "year", "month", "raw_xml_path"]
+    )
 
 
-def build_monthly_lookback(events):
-    outputs = []
-
-    for report_year, report_month in REPORT_MONTHS:
-        report_start, report_end = month_bounds(report_year, report_month)
-
-        current_month = events[
-            (events["year"] == report_year) &
-            (events["month"] == report_month)
-        ].copy()
-
-        history = events[
-            events["event_date"] <= report_end
-        ].copy()
-
-        if current_month.empty:
-            continue
-
-        # latest policy/member state from history
-        history = history.sort_values([
-            "entity_key",
-            "event_date",
-            "year",
-            "month",
-            "status_rank",
-            "raw_xml_path"
-        ])
-
-        latest_entity_state = history.drop_duplicates("entity_key", keep="last").copy()
-
-        # current valid policy per person from history
-        latest_entity_state["coverage_active_in_report_month"] = (
-            (latest_entity_state["benefit_effective_date"].isna() |
-             (latest_entity_state["benefit_effective_date"] <= report_end))
-            &
-            (latest_entity_state["benefit_end_date"].isna() |
-             (latest_entity_state["benefit_end_date"] >= report_start))
-        )
-
-        latest_entity_state["priority_date"] = (
-            latest_entity_state["benefit_effective_date"]
-            .fillna(latest_entity_state["event_date"])
-            .fillna(latest_entity_state["file_month_date"])
-        )
-
-        current_policy_per_person = latest_entity_state.sort_values([
-            "person_key",
-            "coverage_active_in_report_month",
-            "priority_date",
-            "event_date",
-            "status_rank"
-        ]).drop_duplicates("person_key", keep="last")[
-            ["person_key", "enrollment_key"]
-        ].rename(columns={"enrollment_key": "current_enrollment_key"})
-
-        enriched = current_month.merge(
-            current_policy_per_person,
-            on="person_key",
-            how="left"
-        )
-
-        enriched["is_current_enrollment_for_person"] = (
-            enriched["enrollment_key"] == enriched["current_enrollment_key"]
-        )
-
-        # monthly base dedup: same entity inside same month should count once
-        enriched = enriched.sort_values([
-            "entity_key",
-            "event_date",
-            "status_rank",
-            "raw_xml_path"
-        ])
-
-        deduped = enriched.drop_duplicates("entity_key", keep="last").copy()
-
-        deduped["report_year"] = report_year
-        deduped["report_month"] = report_month
-
-        deduped["months_since_event"] = (
-            (report_end.year - deduped["event_date"].dt.year) * 12
-            + (report_end.month - deduped["event_date"].dt.month)
-        )
-
-        deduped["business_status"] = deduped["status"]
-
-        # REINSTATE already mapped to CONFIRM
-        # 3-month cancel rule
-        deduped.loc[
-            (deduped["status"] == "CANCEL") &
-            (deduped["months_since_event"] >= 3),
-            "business_status"
-        ] = "TERM"
-
-        # Exclude superseded current-month records
-        deduped["include_in_business_count"] = deduped["is_current_enrollment_for_person"]
-
-        outputs.append(deduped)
-
-    if not outputs:
-        return pd.DataFrame()
-
-    return pd.concat(outputs, ignore_index=True)
-
-
-def summarize(df, status_col, prefix, only_included=False):
-    work = df.copy()
-
-    if only_included:
-        work = work[work["include_in_business_count"] == True].copy()
-
+def create_member_policy_summary(df):
     return (
-        work.groupby(["issuer", "report_year", "report_month", "insurance_type", status_col], dropna=False)
+        df.groupby(["member_id", "insurance_type"], dropna=False)
         .agg(
-            **{
-                f"{prefix}_rows": ("member_id", "size"),
-                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
-                f"{prefix}_enrollee_count": ("member_id", "nunique"),
-                f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
-                f"{prefix}_file_count": ("raw_xml_path", "nunique"),
-            }
+            policy_count=("enrollment_key", "nunique"),
+            subscriber_count=("subscriber_id", "nunique"),
+            event_rows=("member_id", "size"),
+            months_seen=("event_month", lambda x: ", ".join(sorted(set(x.dropna())))),
+            statuses_seen=("status_normalized", lambda x: ", ".join(sorted(set(x.dropna())))),
+            first_event_date=("event_date", "min"),
+            last_event_date=("event_date", "max"),
+            jan_records=("is_focus_month_record", "sum"),
         )
         .reset_index()
-        .rename(columns={
-            "report_year": "year",
-            "report_month": "month",
-            status_col: "status"
-        })
-        .sort_values(["issuer", "year", "month", "insurance_type", "status"])
+        .sort_values(["policy_count", "event_rows"], ascending=False)
     )
 
 
-def issuer_month_summary(df, prefix, only_included=False):
-    work = df.copy()
-
-    if only_included:
-        work = work[work["include_in_business_count"] == True].copy()
-
+def create_policy_timeline(df):
     return (
-        work.groupby(["issuer", "report_year", "report_month"], dropna=False)
+        df.groupby(
+            ["member_id", "insurance_type", "enrollment_key"],
+            dropna=False
+        )
         .agg(
-            **{
-                f"{prefix}_rows": ("member_id", "size"),
-                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
-                f"{prefix}_enrollee_count": ("member_id", "nunique"),
-                f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
-                f"{prefix}_file_count": ("raw_xml_path", "nunique"),
-                f"{prefix}_confirm_count": ("business_status", lambda x: (x == "CONFIRM").sum()),
-                f"{prefix}_cancel_count": ("business_status", lambda x: (x == "CANCEL").sum()),
-                f"{prefix}_term_count": ("business_status", lambda x: (x == "TERM").sum()),
-            }
+            event_rows=("member_id", "size"),
+            months_seen=("event_month", lambda x: ", ".join(sorted(set(x.dropna())))),
+            statuses_seen=("status_normalized", lambda x: ", ".join(sorted(set(x.dropna())))),
+            first_event_date=("event_date", "min"),
+            last_event_date=("event_date", "max"),
+            benefit_start=("benefit_effective_date", "min"),
+            benefit_end=("benefit_end_date", "max"),
+            subscriber_ids=("subscriber_id", lambda x: ", ".join(sorted(set(x.dropna().astype(str))))),
+            jan_records=("is_focus_month_record", "sum"),
         )
         .reset_index()
-        .rename(columns={
-            "report_year": "year",
-            "report_month": "month"
-        })
-        .sort_values(["issuer", "year", "month"])
+        .sort_values(["member_id", "first_event_date", "enrollment_key"])
     )
 
 
-def exclusion_summary(df):
-    return (
-        df.groupby(["issuer", "report_year", "report_month", "include_in_business_count"], dropna=False)
-        .agg(
-            rows=("member_id", "size"),
-            enrollments=("enrollment_key", "nunique"),
-            enrollees=("member_id", "nunique"),
-            subscribers=("subscriber_id", "nunique"),
-        )
-        .reset_index()
-        .rename(columns={
-            "report_year": "year",
-            "report_month": "month"
-        })
-        .sort_values(["issuer", "year", "month", "include_in_business_count"])
-    )
+def create_possible_superseded(df):
+    multi = create_member_policy_summary(df)
+    multi_members = set(multi[multi["policy_count"] > 1]["member_id"].astype(str))
+
+    return df[df["member_id"].astype(str).isin(multi_members)].copy()
 
 
-def raw_month_summary(events):
-    report_set = set(REPORT_MONTHS)
+def write_excel(sheets):
+    with pd.ExcelWriter(OUTPUT_EXCEL, engine="openpyxl") as writer:
+        for name, data in sheets.items():
+            data.to_excel(writer, sheet_name=name[:31], index=False)
 
-    work = events[
-        events[["year", "month"]].apply(lambda r: (r["year"], r["month"]) in report_set, axis=1)
-    ].copy()
-
-    return (
-        work.groupby(["issuer", "year", "month"], dropna=False)
-        .agg(
-            raw_rows=("member_id", "size"),
-            raw_enrollment_count=("enrollment_key", "nunique"),
-            raw_enrollee_count=("member_id", "nunique"),
-            raw_subscriber_count=("subscriber_id", "nunique"),
-            raw_file_count=("raw_xml_path", "nunique"),
-        )
-        .reset_index()
-        .sort_values(["issuer", "year", "month"])
-    )
-
-
-def compare_raw_business(raw, business):
-    comp = raw.merge(
-        business,
-        on=["issuer", "year", "month"],
-        how="outer"
-    ).fillna(0)
-
-    for col in comp.columns:
-        if col.endswith("_count") or col.endswith("_rows"):
-            comp[col] = comp[col].astype(int)
-
-    comp["row_reduction"] = comp["raw_rows"] - comp["business_rows"]
-    comp["enrollment_reduction"] = comp["raw_enrollment_count"] - comp["business_enrollment_count"]
-    comp["enrollee_reduction"] = comp["raw_enrollee_count"] - comp["business_enrollee_count"]
-    comp["subscriber_reduction"] = comp["raw_subscriber_count"] - comp["business_subscriber_count"]
-
-    return comp.sort_values(["issuer", "year", "month"])
-
-
-def write_excel(path, sheets):
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        for name, df in sheets.items():
-            sheet = name[:31]
-
-            if df is None or df.empty:
-                pd.DataFrame({"message": ["No data"]}).to_excel(writer, sheet_name=sheet, index=False)
-            else:
-                df.head(1_048_000).to_excel(writer, sheet_name=sheet, index=False)
-
-        for sheet in writer.book.sheetnames:
-            ws = writer.book[sheet]
+        for sheet_name in writer.book.sheetnames:
+            ws = writer.book[sheet_name]
             ws.freeze_panes = "A2"
             ws.auto_filter.ref = ws.dimensions
 
             for col in ws.columns:
-                width = min(max(len(str(cell.value)) if cell.value is not None else 0 for cell in col) + 2, 45)
+                width = min(max(len(str(cell.value)) if cell.value else 0 for cell in col) + 2, 45)
                 ws.column_dimensions[col[0].column_letter].width = width
 
 
 def main():
-    print("Reading events...")
-    raw = read_events()
-    print(f"Raw events: {len(raw)}")
+    print("Loading 15105 Jan lifecycle investigation data...")
+    raw = load_data()
+    print(f"Rows loaded: {len(raw)}")
 
-    print("Cleaning...")
-    events = clean(raw)
+    clean_df = clean(raw)
 
-    print("Building monthly lookback business records...")
-    monthly = build_monthly_lookback(events)
-    print(f"Monthly lookback rows: {len(monthly)}")
+    member_summary = create_member_policy_summary(clean_df)
+    policy_timeline = create_policy_timeline(clean_df)
+    superseded_candidates = create_possible_superseded(clean_df)
 
-    print("Summarizing...")
-    raw_summary = raw_month_summary(events)
-    business_summary = summarize(monthly, "business_status", "business", only_included=True)
-    monthly_all_summary = summarize(monthly, "business_status", "monthly_all", only_included=False)
-
-    business_issuer_month = issuer_month_summary(monthly, "business", only_included=True)
-    all_issuer_month = issuer_month_summary(monthly, "monthly_all", only_included=False)
-
-    excluded = exclusion_summary(monthly)
-
-    comparison = compare_raw_business(raw_summary, business_issuer_month)
-
-    excluded_records = monthly[monthly["include_in_business_count"] == False].copy()
-
-    print("Writing Excel...")
-    write_excel(
-        OUTPUT_EXCEL,
-        {
-            "Raw_vs_Business_Compare": comparison,
-            "Business_Issuer_Month": business_issuer_month,
-            "All_Current_Month_Records": all_issuer_month,
-            "Business_Status_Summary": business_summary,
-            "All_Status_Summary": monthly_all_summary,
-            "Exclusion_Summary": excluded,
-            "Excluded_Records_Sample": excluded_records.head(5000),
-            "Monthly_Lookback_Sample": monthly.head(20000),
-            "Raw_Month_Summary": raw_summary,
-        }
-    )
+    write_excel({
+        "Member_Policy_Summary": member_summary,
+        "Policy_Timeline": policy_timeline,
+        "Superseded_Candidates": superseded_candidates,
+        "Investigation_Raw": clean_df,
+    })
 
     print("\nDone cicim:")
     print(OUTPUT_EXCEL.resolve())
