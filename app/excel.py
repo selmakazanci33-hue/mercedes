@@ -1,431 +1,353 @@
 import sqlite3
-import urllib.parse
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import create_engine, text
 
 
 # =====================================================
-# CONFIGURATION
+# CONFIG
 # =====================================================
-
-YEAR = 2026
-START_DATE = "2026-01-01"
-END_DATE = "2026-06-01"   # Jan-May, June 1 exclusive
 
 SQLITE_DB_PATH = Path("data/issuer_834.db")
 
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-OUTPUT_EXCEL = OUTPUT_DIR / "final_db_vs_xml_834_comparison_2026_jan_may.xlsx"
+OUTPUT_EXCEL = OUTPUT_DIR / "xml_timeline_state_engine_2026_jan_may.xlsx"
+
+HISTORY_MONTHS = [
+    ("2025", "10"),
+    ("2025", "11"),
+    ("2025", "12"),
+    ("2026", "01"),
+    ("2026", "02"),
+    ("2026", "03"),
+    ("2026", "04"),
+    ("2026", "05"),
+]
+
+REPORT_MONTHS = [
+    ("2026", "01"),
+    ("2026", "02"),
+    ("2026", "03"),
+    ("2026", "04"),
+    ("2026", "05"),
+]
 
 
 # =====================================================
-# AZURE SQL CONNECTION - KEEP THIS STYLE
+# READ XML SQLITE
 # =====================================================
 
-SERVER = "ga......"       # Data Source
-DATABASE = "ga......"     # Initial Catalog
-USERNAME = "sk..."        # User ID
-DRIVER = "ODBC Driver 18 for SQL Server"
-
-
-def get_azure_engine():
-    conn_str = (
-        f"DRIVER={{{DRIVER}}};"
-        f"SERVER={SERVER};"
-        f"DATABASE={DATABASE};"
-        f"UID={USERNAME};"
-        f"Authentication=ActiveDirectoryInteractive;"
-        f"Encrypt=yes;"
-        f"TrustServerCertificate=no;"
-        f"Connection Timeout=30;"
-    )
-
-    params = urllib.parse.quote_plus(conn_str)
-    return create_engine(f"mssql+pyodbc:///?odbc_connect={params}")
-
-
-def read_azure(engine, sql):
-    with engine.connect() as conn:
-        return pd.read_sql_query(text(sql), conn)
-
-
-# =====================================================
-# AZURE DB 834 RAW DATA
-# =====================================================
-
-def get_db_834_raw(engine):
-    sql = f"""
-    SELECT
-        Coverage_Year AS year,
-        GAA_HIOS_ID AS issuer,
-        GAA_Load_Date AS load_date,
-        GAA_834_File_Name AS file_name,
-        GAA_834_File_Date AS file_date,
-
-        exchgAssignedPolicyID AS policy_id,
-        exchgIndivIdentifier AS member_id,
-        exchgSubscriberIdentifier AS subscriber_id,
-        householdOrEmployeeCaseID AS household_id,
-
-        previousExchgAssignedPolicyID AS previous_policy_id,
-        healthCoveragePolicyID AS health_coverage_policy_id,
-
-        Insurance_Type AS insurance_type,
-        planCoverageDescription AS plan_coverage_description,
-
-        enrolleeStatus AS status,
-        enrolleeStatusDate AS status_date,
-
-        actionCode AS action_code,
-        actionCode_desc AS action_code_desc,
-
-        event_type_code,
-        event_type_code_desc,
-        event_reason_code,
-        event_reason_code_desc,
-
-        subscriberFlag AS subscriber_flag,
-        member_relationship AS relationship,
-
-        memberFirstName AS first_name,
-        memberMiddleName AS middle_name,
-        memberLastName AS last_name,
-        memberBirthDate AS birth_date,
-        memberGender AS gender,
-        memberSSN AS ssn,
-
-        benefitEffectiveBeginDate AS benefit_effective_date,
-        benefitEffectiveEndDate AS benefit_end_date,
-        memberEligibilityBeginDate AS eligibility_begin_date,
-        memberEligibilityEndDate AS eligibility_end_date,
-        memberMaintEffectiveDate AS member_maint_effective_date,
-
-        healthCoveragePremiumAmt AS premium_amount,
-        totalIndivResponsibilityAmt AS responsibility_amount,
-        aptcAmt AS aptc_amount,
-        csrAmt AS csr_amount,
-        totalPremiumAmt AS total_premium_amount,
-
-        renewalStatus AS renewal_status,
-        sepReason AS sep_reason,
-        qleReason AS qle_reason,
-
-        homeCity AS home_city,
-        homeCounty AS home_county,
-        homeState AS home_state,
-        homeZip AS home_zip
-    FROM dbo.[834_Inbound_test]
-    WHERE Coverage_Year = {YEAR}
-      AND GAA_834_File_Date >= '{START_DATE}'
-      AND GAA_834_File_Date < '{END_DATE}'
-      AND enrolleeStatus IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
-    """
-
-    return read_azure(engine, sql)
-
-
-def get_db_header_summary(engine):
-    sql = f"""
-    SELECT
-        GAA_HIOS_ID AS issuer,
-        GAA_Load_Date AS load_date,
-        GAA_834_File_Name AS file_name,
-        GAA_834_File_Date AS file_date,
-        record_count,
-        enrollment_count,
-        enrollee_count,
-        confirm_count,
-        cancel_count,
-        term_count
-    FROM dbo.[834_Inbound_header_test]
-    WHERE GAA_834_File_Date >= '{START_DATE}'
-      AND GAA_834_File_Date < '{END_DATE}'
-    """
-
-    return read_azure(engine, sql)
-
-
-# =====================================================
-# XML / SQLITE DATA
-# =====================================================
-
-def get_xml_raw():
+def get_xml_events():
     if not SQLITE_DB_PATH.exists():
         raise FileNotFoundError(f"SQLite DB not found: {SQLITE_DB_PATH.resolve()}")
 
-    conn = sqlite3.connect(SQLITE_DB_PATH)
+    where_parts = []
+    for year, month in HISTORY_MONTHS:
+        where_parts.append(f"(year = '{year}' AND month = '{month}')")
+
+    where_sql = " OR ".join(where_parts)
 
     sql = f"""
     SELECT
-        year,
         issuer,
+        year,
         month,
-        raw_xml_path AS file_name,
-
         policy_id,
         member_id,
         subscriber_id,
         household_or_employee_case_id AS household_id,
-
         insurance_type_code,
         additional_maint_reason_code,
-
         subscriber_flag,
         relationship,
-
         benefit_effective_date,
         benefit_end_date,
         member_maint_effective_date,
-
-        first_name,
-        last_name,
-        birth_date
+        raw_xml_path
     FROM stg_834_records
-    WHERE year = '{YEAR}'
-      AND month IN ('01','02','03','04','05')
+    WHERE ({where_sql})
       AND additional_maint_reason_code IN ('CONFIRM', 'REINSTATE', 'CANCEL', 'TERM')
     """
 
+    conn = sqlite3.connect(SQLITE_DB_PATH)
     df = pd.read_sql_query(sql, conn)
     conn.close()
+
     return df
 
 
 # =====================================================
-# CLEANUP
+# CLEANUP / NORMALIZATION
 # =====================================================
 
-def normalize_status(value):
-    if pd.isna(value):
-        return None
-
-    value = str(value).strip().upper()
-
-    if value == "REINSTATE":
-        return "CONFIRM"
-
-    return value
-
-
-def normalize_db_insurance_type(value):
-    if pd.isna(value):
-        return "Unknown"
-
-    value = str(value).strip()
-
-    if value.upper() == "DENTAL":
-        return "Dental"
-
-    if value.upper() == "HEALTH":
-        return "Health"
-
-    return value
-
-
-def normalize_xml_insurance_type(value):
-    if pd.isna(value):
-        return "Unknown"
-
-    value = str(value).strip().upper()
-
-    if value == "DEN":
-        return "Dental"
-
-    return "Health"
-
-
-def clean_db_834(df):
+def clean_events(df):
     clean = df.copy()
 
-    clean["source"] = "AZURE_DB"
-    clean["issuer"] = clean["issuer"].astype(str)
-    clean["year"] = clean["year"].astype(str)
-    clean["month"] = pd.to_datetime(clean["file_date"], errors="coerce").dt.strftime("%m")
-
-    clean["status"] = clean["status"].apply(normalize_status)
-    clean["insurance_type"] = clean["insurance_type"].apply(normalize_db_insurance_type)
-
-    clean["policy_id"] = clean["policy_id"].astype(str)
-    clean["member_id"] = clean["member_id"].astype(str)
-    clean["subscriber_id"] = clean["subscriber_id"].astype(str)
-
-    clean["enrollment_key"] = clean["policy_id"]
-
-    return clean
-
-
-def clean_xml(df):
-    clean = df.copy()
-
-    clean["source"] = "XML_SQLITE"
     clean["issuer"] = clean["issuer"].astype(str)
     clean["year"] = clean["year"].astype(str)
     clean["month"] = clean["month"].astype(str).str.zfill(2)
 
-    clean["status"] = clean["additional_maint_reason_code"].apply(normalize_status)
-    clean["insurance_type"] = clean["insurance_type_code"].apply(normalize_xml_insurance_type)
+    clean["status"] = clean["additional_maint_reason_code"].replace({
+        "REINSTATE": "CONFIRM"
+    })
 
-    clean["policy_id"] = clean["policy_id"].astype(str)
-    clean["member_id"] = clean["member_id"].astype(str)
-    clean["subscriber_id"] = clean["subscriber_id"].astype(str)
+    clean["insurance_type"] = clean["insurance_type_code"].apply(
+        lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
+    )
+
+    for col in ["policy_id", "member_id", "subscriber_id", "household_id"]:
+        clean[col] = clean[col].astype(str)
+        clean[col] = clean[col].replace(["None", "nan", "NaN", ""], pd.NA)
 
     def enrollment_key(row):
         for col in ["policy_id", "subscriber_id", "household_id"]:
             val = row.get(col)
-            if pd.notna(val) and str(val).strip() not in ["", "None", "nan"]:
-                return str(val)
+            if pd.notna(val) and str(val).strip():
+                return str(val).strip()
         return None
 
     clean["enrollment_key"] = clean.apply(enrollment_key, axis=1)
+
+    clean["entity_key"] = (
+        clean["issuer"].astype(str) + "|" +
+        clean["insurance_type"].astype(str) + "|" +
+        clean["enrollment_key"].astype(str) + "|" +
+        clean["member_id"].astype(str)
+    )
+
+    clean["benefit_effective_date"] = pd.to_datetime(clean["benefit_effective_date"], errors="coerce")
+    clean["benefit_end_date"] = pd.to_datetime(clean["benefit_end_date"], errors="coerce")
+    clean["member_maint_effective_date"] = pd.to_datetime(clean["member_maint_effective_date"], errors="coerce")
+
+    clean["file_month_date"] = pd.to_datetime(
+        clean["year"] + "-" + clean["month"] + "-01",
+        errors="coerce"
+    )
+
+    clean["event_date"] = (
+        clean["member_maint_effective_date"]
+        .fillna(clean["benefit_effective_date"])
+        .fillna(clean["file_month_date"])
+    )
 
     return clean
 
 
 # =====================================================
-# SUMMARIES
+# RAW EVENT SUMMARY
 # =====================================================
 
-def summarize_records(df, prefix):
+def raw_event_summary(df):
     return (
-        df.groupby(
-            ["issuer", "year", "month", "insurance_type", "status"],
+        df.groupby(["issuer", "year", "month", "insurance_type", "status"], dropna=False)
+        .agg(
+            raw_event_rows=("member_id", "size"),
+            raw_enrollment_count=("enrollment_key", "nunique"),
+            raw_enrollee_count=("member_id", "nunique"),
+            raw_subscriber_count=("subscriber_id", "nunique"),
+            raw_file_count=("raw_xml_path", "nunique"),
+        )
+        .reset_index()
+        .sort_values(["issuer", "year", "month", "insurance_type", "status"])
+    )
+
+
+# =====================================================
+# TIMELINE ENGINE
+# =====================================================
+
+def month_start_end(year, month):
+    start = pd.Timestamp(f"{year}-{month}-01")
+    end = start + pd.offsets.MonthEnd(0)
+    return start, end
+
+
+def build_timeline_states(events):
+    all_states = []
+
+    for report_year, report_month in REPORT_MONTHS:
+        report_start, report_end = month_start_end(report_year, report_month)
+
+        eligible = events[events["event_date"] <= report_end].copy()
+
+        if eligible.empty:
+            continue
+
+        eligible = eligible.sort_values([
+            "entity_key",
+            "event_date",
+            "year",
+            "month",
+            "raw_xml_path"
+        ])
+
+        latest = eligible.drop_duplicates("entity_key", keep="last").copy()
+
+        latest["report_year"] = report_year
+        latest["report_month"] = report_month
+        latest["report_start"] = report_start
+        latest["report_end"] = report_end
+
+        latest["months_since_event"] = (
+            (report_end.year - latest["event_date"].dt.year) * 12
+            + (report_end.month - latest["event_date"].dt.month)
+        )
+
+        latest["business_status_3mo"] = latest["status"]
+
+        latest.loc[
+            (latest["status"] == "CANCEL") &
+            (latest["months_since_event"] >= 3),
+            "business_status_3mo"
+        ] = "TERM"
+
+        latest["coverage_active_in_month"] = (
+            (latest["benefit_effective_date"].isna() | (latest["benefit_effective_date"] <= report_end))
+            &
+            (latest["benefit_end_date"].isna() | (latest["benefit_end_date"] >= report_start))
+        )
+
+        all_states.append(latest)
+
+    if not all_states:
+        return pd.DataFrame()
+
+    return pd.concat(all_states, ignore_index=True)
+
+
+# =====================================================
+# TIMELINE SUMMARIES
+# =====================================================
+
+def summarize_timeline_latest(states):
+    return (
+        states.groupby(
+            ["issuer", "report_year", "report_month", "insurance_type", "status"],
             dropna=False
         )
         .agg(
+            timeline_entity_rows=("entity_key", "size"),
+            timeline_enrollment_count=("enrollment_key", "nunique"),
+            timeline_enrollee_count=("member_id", "nunique"),
+            timeline_subscriber_count=("subscriber_id", "nunique"),
+            latest_event_files=("raw_xml_path", "nunique"),
+        )
+        .reset_index()
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month"
+        })
+        .sort_values(["issuer", "year", "month", "insurance_type", "status"])
+    )
+
+
+def summarize_timeline_business_3mo(states):
+    return (
+        states.groupby(
+            ["issuer", "report_year", "report_month", "insurance_type", "business_status_3mo"],
+            dropna=False
+        )
+        .agg(
+            business_entity_rows=("entity_key", "size"),
+            business_enrollment_count=("enrollment_key", "nunique"),
+            business_enrollee_count=("member_id", "nunique"),
+            business_subscriber_count=("subscriber_id", "nunique"),
+        )
+        .reset_index()
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month",
+            "business_status_3mo": "status"
+        })
+        .sort_values(["issuer", "year", "month", "insurance_type", "status"])
+    )
+
+
+def summarize_coverage_active(states):
+    active = states[states["coverage_active_in_month"] == True].copy()
+
+    return (
+        active.groupby(
+            ["issuer", "report_year", "report_month", "insurance_type", "status"],
+            dropna=False
+        )
+        .agg(
+            active_entity_rows=("entity_key", "size"),
+            active_enrollment_count=("enrollment_key", "nunique"),
+            active_enrollee_count=("member_id", "nunique"),
+            active_subscriber_count=("subscriber_id", "nunique"),
+        )
+        .reset_index()
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month"
+        })
+        .sort_values(["issuer", "year", "month", "insurance_type", "status"])
+    )
+
+
+def issuer_month_summary(states, status_col, prefix):
+    return (
+        states.groupby(["issuer", "report_year", "report_month"], dropna=False)
+        .agg(
             **{
-                f"{prefix}_raw_rows": ("member_id", "size"),
+                f"{prefix}_entity_rows": ("entity_key", "size"),
                 f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
                 f"{prefix}_enrollee_count": ("member_id", "nunique"),
                 f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
-                f"{prefix}_file_count": ("file_name", "nunique"),
+                f"{prefix}_confirm_count": (status_col, lambda x: (x == "CONFIRM").sum()),
+                f"{prefix}_cancel_count": (status_col, lambda x: (x == "CANCEL").sum()),
+                f"{prefix}_term_count": (status_col, lambda x: (x == "TERM").sum()),
             }
         )
         .reset_index()
-    )
-
-
-def summarize_by_issuer_month(df, prefix):
-    return (
-        df.groupby(
-            ["issuer", "year", "month"],
-            dropna=False
-        )
-        .agg(
-            **{
-                f"{prefix}_raw_rows": ("member_id", "size"),
-                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
-                f"{prefix}_enrollee_count": ("member_id", "nunique"),
-                f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
-                f"{prefix}_file_count": ("file_name", "nunique"),
-            }
-        )
-        .reset_index()
-    )
-
-
-def summarize_by_file(df, prefix):
-    return (
-        df.groupby(
-            ["issuer", "year", "month", "file_name"],
-            dropna=False
-        )
-        .agg(
-            **{
-                f"{prefix}_raw_rows": ("member_id", "size"),
-                f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
-                f"{prefix}_enrollee_count": ("member_id", "nunique"),
-                f"{prefix}_confirm_count": ("status", lambda x: (x == "CONFIRM").sum()),
-                f"{prefix}_cancel_count": ("status", lambda x: (x == "CANCEL").sum()),
-                f"{prefix}_term_count": ("status", lambda x: (x == "TERM").sum()),
-            }
-        )
-        .reset_index()
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month"
+        })
+        .sort_values(["issuer", "year", "month"])
     )
 
 
 # =====================================================
-# COMPARISON
+# DATA QUALITY CHECKS
 # =====================================================
 
-def compare_status_summary(db_summary, xml_summary):
-    comparison = pd.merge(
-        db_summary,
-        xml_summary,
-        how="outer",
-        on=["issuer", "year", "month", "insurance_type", "status"]
-    )
-
-    numeric_cols = [
-        "db_raw_rows", "db_enrollment_count", "db_enrollee_count",
-        "db_subscriber_count", "db_file_count",
-        "xml_raw_rows", "xml_enrollment_count", "xml_enrollee_count",
-        "xml_subscriber_count", "xml_file_count",
-    ]
-
-    for col in numeric_cols:
-        if col in comparison.columns:
-            comparison[col] = comparison[col].fillna(0).astype(int)
-
-    comparison["raw_row_diff"] = comparison["db_raw_rows"] - comparison["xml_raw_rows"]
-    comparison["enrollment_diff"] = comparison["db_enrollment_count"] - comparison["xml_enrollment_count"]
-    comparison["enrollee_diff"] = comparison["db_enrollee_count"] - comparison["xml_enrollee_count"]
-    comparison["subscriber_diff"] = comparison["db_subscriber_count"] - comparison["xml_subscriber_count"]
-    comparison["file_count_diff"] = comparison["db_file_count"] - comparison["xml_file_count"]
-
-    comparison["match_status"] = comparison.apply(
-        lambda r: "MATCH"
-        if r["raw_row_diff"] == 0
-        and r["enrollment_diff"] == 0
-        and r["enrollee_diff"] == 0
-        and r["subscriber_diff"] == 0
-        else "MISMATCH",
-        axis=1
-    )
-
-    return comparison.sort_values(
-        ["match_status", "issuer", "year", "month", "insurance_type", "status"]
+def month_load_check(events):
+    return (
+        events.groupby(["issuer", "year", "month"], dropna=False)
+        .agg(
+            event_rows=("member_id", "size"),
+            enrollment_count=("enrollment_key", "nunique"),
+            enrollee_count=("member_id", "nunique"),
+            file_count=("raw_xml_path", "nunique"),
+            min_event_date=("event_date", "min"),
+            max_event_date=("event_date", "max"),
+        )
+        .reset_index()
+        .sort_values(["issuer", "year", "month"])
     )
 
 
-def compare_issuer_month(db_month, xml_month):
-    comparison = pd.merge(
-        db_month,
-        xml_month,
-        how="outer",
-        on=["issuer", "year", "month"]
+def duplicate_event_check(events):
+    return (
+        events.groupby(
+            ["issuer", "year", "month", "insurance_type", "enrollment_key", "member_id", "status"],
+            dropna=False
+        )
+        .agg(
+            duplicate_rows=("raw_xml_path", "size"),
+            file_count=("raw_xml_path", "nunique"),
+            min_event_date=("event_date", "min"),
+            max_event_date=("event_date", "max"),
+        )
+        .reset_index()
+        .query("duplicate_rows > 1")
+        .sort_values(["duplicate_rows"], ascending=False)
+        .head(1000)
     )
-
-    numeric_cols = [
-        "db_raw_rows", "db_enrollment_count", "db_enrollee_count",
-        "db_subscriber_count", "db_file_count",
-        "xml_raw_rows", "xml_enrollment_count", "xml_enrollee_count",
-        "xml_subscriber_count", "xml_file_count",
-    ]
-
-    for col in numeric_cols:
-        if col in comparison.columns:
-            comparison[col] = comparison[col].fillna(0).astype(int)
-
-    comparison["raw_row_diff"] = comparison["db_raw_rows"] - comparison["xml_raw_rows"]
-    comparison["enrollment_diff"] = comparison["db_enrollment_count"] - comparison["xml_enrollment_count"]
-    comparison["enrollee_diff"] = comparison["db_enrollee_count"] - comparison["xml_enrollee_count"]
-    comparison["subscriber_diff"] = comparison["db_subscriber_count"] - comparison["xml_subscriber_count"]
-    comparison["file_count_diff"] = comparison["db_file_count"] - comparison["xml_file_count"]
-
-    comparison["match_status"] = comparison.apply(
-        lambda r: "MATCH"
-        if r["raw_row_diff"] == 0
-        and r["enrollment_diff"] == 0
-        and r["enrollee_diff"] == 0
-        else "MISMATCH",
-        axis=1
-    )
-
-    return comparison.sort_values(["match_status", "issuer", "year", "month"])
 
 
 # =====================================================
@@ -437,10 +359,13 @@ def write_excel(path, sheets):
         for sheet_name, df in sheets.items():
             safe_name = sheet_name[:31]
 
-            if len(df) > 1_048_000:
-                df.head(1_048_000).to_excel(writer, sheet_name=safe_name, index=False)
+            if df is None or df.empty:
+                pd.DataFrame({"message": ["No data"]}).to_excel(writer, sheet_name=safe_name, index=False)
             else:
-                df.to_excel(writer, sheet_name=safe_name, index=False)
+                if len(df) > 1_048_000:
+                    df.head(1_048_000).to_excel(writer, sheet_name=safe_name, index=False)
+                else:
+                    df.to_excel(writer, sheet_name=safe_name, index=False)
 
         for sheet_name in writer.book.sheetnames:
             ws = writer.book[sheet_name]
@@ -463,52 +388,51 @@ def write_excel(path, sheets):
 # =====================================================
 
 def main():
-    print("Connecting to Azure...")
-    engine = get_azure_engine()
+    print("Reading XML events from SQLite...")
+    raw = get_xml_events()
+    print(f"Raw history events: {len(raw)}")
 
-    print("Reading Azure 834 raw data...")
-    db_raw = get_db_834_raw(engine)
-    print(f"Azure raw rows: {len(db_raw)}")
+    print("Cleaning events...")
+    events = clean_events(raw)
+    print(f"Clean history events: {len(events)}")
 
-    print("Reading Azure 834 header summary...")
-    db_header = get_db_header_summary(engine)
-    print(f"Azure header rows: {len(db_header)}")
+    print("Creating raw event summary...")
+    raw_summary = raw_event_summary(events)
 
-    print("Reading XML / SQLite data...")
-    xml_raw = get_xml_raw()
-    print(f"XML raw rows: {len(xml_raw)}")
+    print("Building timeline states...")
+    states = build_timeline_states(events)
+    print(f"Timeline state rows: {len(states)}")
 
-    print("Cleaning data...")
-    db_clean = clean_db_834(db_raw)
-    xml_clean = clean_xml(xml_raw)
+    print("Creating timeline summaries...")
+    latest_summary = summarize_timeline_latest(states)
+    business_3mo_summary = summarize_timeline_business_3mo(states)
+    active_summary = summarize_coverage_active(states)
 
-    print("Creating summaries...")
-    db_summary = summarize_records(db_clean, "db")
-    xml_summary = summarize_records(xml_clean, "xml")
+    latest_issuer_month = issuer_month_summary(states, "status", "latest")
+    business_issuer_month = issuer_month_summary(states, "business_status_3mo", "business")
 
-    db_month = summarize_by_issuer_month(db_clean, "db")
-    xml_month = summarize_by_issuer_month(xml_clean, "xml")
+    active_states = states[states["coverage_active_in_month"] == True].copy()
+    active_issuer_month = issuer_month_summary(active_states, "status", "active")
 
-    db_file_summary = summarize_by_file(db_clean, "db")
-    xml_file_summary = summarize_by_file(xml_clean, "xml")
+    print("Creating checks...")
+    load_check = month_load_check(events)
+    duplicate_check = duplicate_event_check(events)
 
-    print("Creating comparisons...")
-    status_comparison = compare_status_summary(db_summary, xml_summary)
-    issuer_month_comparison = compare_issuer_month(db_month, xml_month)
-
-    print("Writing Excel report...")
+    print("Writing Excel...")
     write_excel(
         OUTPUT_EXCEL,
         {
-            "Issuer_Month_Comparison": issuer_month_comparison,
-            "DB_vs_XML_Status": status_comparison,
-            "DB_Summary": db_summary,
-            "XML_Summary": xml_summary,
-            "DB_File_Summary": db_file_summary,
-            "XML_File_Summary": xml_file_summary,
-            "DB_Header_Summary": db_header,
-            "DB_834_Raw": db_raw,
-            "XML_Raw": xml_raw,
+            "Load_Check": load_check,
+            "Raw_Event_Summary": raw_summary,
+            "Timeline_Latest_Summary": latest_summary,
+            "Timeline_Business_3mo": business_3mo_summary,
+            "Coverage_Active_Summary": active_summary,
+            "Issuer_Month_Latest": latest_issuer_month,
+            "Issuer_Month_Business_3mo": business_issuer_month,
+            "Issuer_Month_Active": active_issuer_month,
+            "Timeline_Entity_State": states,
+            "Duplicate_Event_Check": duplicate_check,
+            "Raw_Events_Sample": events.head(100000),
         }
     )
 
