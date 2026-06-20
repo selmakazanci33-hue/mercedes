@@ -4,10 +4,11 @@ import pandas as pd
 
 
 SQLITE_DB_PATH = Path("data/issuer_834.db")
+
 OUTPUT_DIR = Path("query_outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-OUTPUT_EXCEL = OUTPUT_DIR / "enrollment_lifecycle_engine_jan_may_2026.xlsx"
+OUTPUT_EXCEL = OUTPUT_DIR / "monthly_event_with_lookback_engine_jan_may_2026.xlsx"
 
 HISTORY_MONTHS = [
     ("2025", "10"), ("2025", "11"), ("2025", "12"),
@@ -15,14 +16,16 @@ HISTORY_MONTHS = [
 ]
 
 REPORT_MONTHS = [
-    ("2026", "01"), ("2026", "02"), ("2026", "03"), ("2026", "04"), ("2026", "05"),
+    ("2026", "01"),
+    ("2026", "02"),
+    ("2026", "03"),
+    ("2026", "04"),
+    ("2026", "05"),
 ]
 
 
-def get_events():
-    where_sql = " OR ".join(
-        [f"(year = '{y}' AND month = '{m}')" for y, m in HISTORY_MONTHS]
-    )
+def read_events():
+    where_sql = " OR ".join([f"(year='{y}' AND month='{m}')" for y, m in HISTORY_MONTHS])
 
     sql = f"""
     SELECT
@@ -52,16 +55,14 @@ def get_events():
     return df
 
 
-def clean_events(df):
+def clean(df):
     df = df.copy()
 
     df["issuer"] = df["issuer"].astype(str)
     df["year"] = df["year"].astype(str)
     df["month"] = df["month"].astype(str).str.zfill(2)
 
-    df["status"] = df["additional_maint_reason_code"].replace({
-        "REINSTATE": "CONFIRM"
-    })
+    df["status"] = df["additional_maint_reason_code"].replace({"REINSTATE": "CONFIRM"})
 
     df["insurance_type"] = df["insurance_type_code"].apply(
         lambda x: "Dental" if str(x).upper() == "DEN" else "Health"
@@ -72,7 +73,13 @@ def clean_events(df):
 
     df["enrollment_key"] = df["policy_id"].fillna(df["subscriber_id"]).fillna(df["household_id"])
 
-    # Person-level key: this is where we resolve old policy vs new policy
+    df["entity_key"] = (
+        df["issuer"].astype(str) + "|" +
+        df["insurance_type"].astype(str) + "|" +
+        df["enrollment_key"].astype(str) + "|" +
+        df["member_id"].astype(str)
+    )
+
     df["person_key"] = (
         df["issuer"].astype(str) + "|" +
         df["insurance_type"].astype(str) + "|" +
@@ -93,7 +100,6 @@ def clean_events(df):
 
     df["status_rank"] = df["status"].map({
         "CONFIRM": 4,
-        "REINSTATE": 4,
         "CANCEL": 3,
         "TERM": 2
     }).fillna(1)
@@ -107,103 +113,125 @@ def month_bounds(year, month):
     return start, end
 
 
-def build_lifecycle_states(events):
-    all_states = []
+def build_monthly_lookback(events):
+    outputs = []
 
     for report_year, report_month in REPORT_MONTHS:
         report_start, report_end = month_bounds(report_year, report_month)
 
-        eligible = events[events["event_date"] <= report_end].copy()
+        current_month = events[
+            (events["year"] == report_year) &
+            (events["month"] == report_month)
+        ].copy()
 
-        if eligible.empty:
+        history = events[
+            events["event_date"] <= report_end
+        ].copy()
+
+        if current_month.empty:
             continue
 
-        eligible["coverage_active_in_month"] = (
-            (eligible["benefit_effective_date"].isna() | (eligible["benefit_effective_date"] <= report_end))
-            &
-            (eligible["benefit_end_date"].isna() | (eligible["benefit_end_date"] >= report_start))
-        )
-
-        # Step 1: latest event per policy/member
-        eligible = eligible.sort_values([
-            "person_key",
-            "enrollment_key",
+        # latest policy/member state from history
+        history = history.sort_values([
+            "entity_key",
             "event_date",
-            "benefit_effective_date",
-            "benefit_end_date",
+            "year",
+            "month",
             "status_rank",
             "raw_xml_path"
         ])
 
-        latest_policy_state = eligible.drop_duplicates(
-            ["person_key", "enrollment_key"],
-            keep="last"
-        ).copy()
+        latest_entity_state = history.drop_duplicates("entity_key", keep="last").copy()
 
-        # Step 2: resolve current policy per person
-        # If same member exists on multiple policies, choose latest valid enrollment.
-        latest_policy_state["policy_priority_date"] = (
-            latest_policy_state["benefit_effective_date"]
-            .fillna(latest_policy_state["event_date"])
+        # current valid policy per person from history
+        latest_entity_state["coverage_active_in_report_month"] = (
+            (latest_entity_state["benefit_effective_date"].isna() |
+             (latest_entity_state["benefit_effective_date"] <= report_end))
+            &
+            (latest_entity_state["benefit_end_date"].isna() |
+             (latest_entity_state["benefit_end_date"] >= report_start))
         )
 
-        current = latest_policy_state.sort_values([
+        latest_entity_state["priority_date"] = (
+            latest_entity_state["benefit_effective_date"]
+            .fillna(latest_entity_state["event_date"])
+            .fillna(latest_entity_state["file_month_date"])
+        )
+
+        current_policy_per_person = latest_entity_state.sort_values([
             "person_key",
-            "coverage_active_in_month",
-            "policy_priority_date",
+            "coverage_active_in_report_month",
+            "priority_date",
+            "event_date",
+            "status_rank"
+        ]).drop_duplicates("person_key", keep="last")[
+            ["person_key", "enrollment_key"]
+        ].rename(columns={"enrollment_key": "current_enrollment_key"})
+
+        enriched = current_month.merge(
+            current_policy_per_person,
+            on="person_key",
+            how="left"
+        )
+
+        enriched["is_current_enrollment_for_person"] = (
+            enriched["enrollment_key"] == enriched["current_enrollment_key"]
+        )
+
+        # monthly base dedup: same entity inside same month should count once
+        enriched = enriched.sort_values([
+            "entity_key",
             "event_date",
             "status_rank",
-            "enrollment_key"
-        ]).drop_duplicates("person_key", keep="last").copy()
+            "raw_xml_path"
+        ])
 
-        current["report_year"] = report_year
-        current["report_month"] = report_month
-        current["report_start"] = report_start
-        current["report_end"] = report_end
+        deduped = enriched.drop_duplicates("entity_key", keep="last").copy()
 
-        current["months_since_event"] = (
-            (report_end.year - current["event_date"].dt.year) * 12
-            + (report_end.month - current["event_date"].dt.month)
+        deduped["report_year"] = report_year
+        deduped["report_month"] = report_month
+
+        deduped["months_since_event"] = (
+            (report_end.year - deduped["event_date"].dt.year) * 12
+            + (report_end.month - deduped["event_date"].dt.month)
         )
 
-        current["business_status"] = current["status"]
+        deduped["business_status"] = deduped["status"]
 
-        # 3-month cancellation rule
-        current.loc[
-            (current["status"] == "CANCEL") &
-            (current["months_since_event"] >= 3),
+        # REINSTATE already mapped to CONFIRM
+        # 3-month cancel rule
+        deduped.loc[
+            (deduped["status"] == "CANCEL") &
+            (deduped["months_since_event"] >= 3),
             "business_status"
         ] = "TERM"
 
-        # If coverage is not active and latest status was CONFIRM, mark as TERM-like business state
-        current.loc[
-            (current["coverage_active_in_month"] == False) &
-            (current["business_status"] == "CONFIRM") &
-            (current["benefit_end_date"].notna()) &
-            (current["benefit_end_date"] < report_start),
-            "business_status"
-        ] = "TERM"
+        # Exclude superseded current-month records
+        deduped["include_in_business_count"] = deduped["is_current_enrollment_for_person"]
 
-        all_states.append(current)
+        outputs.append(deduped)
 
-    if not all_states:
+    if not outputs:
         return pd.DataFrame()
 
-    return pd.concat(all_states, ignore_index=True)
+    return pd.concat(outputs, ignore_index=True)
 
 
-def summarize_current(states, status_col, prefix):
+def summarize(df, status_col, prefix, only_included=False):
+    work = df.copy()
+
+    if only_included:
+        work = work[work["include_in_business_count"] == True].copy()
+
     return (
-        states.groupby(
-            ["issuer", "report_year", "report_month", "insurance_type", status_col],
-            dropna=False
-        )
+        work.groupby(["issuer", "report_year", "report_month", "insurance_type", status_col], dropna=False)
         .agg(
             **{
-                f"{prefix}_person_count": ("person_key", "nunique"),
+                f"{prefix}_rows": ("member_id", "size"),
                 f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
                 f"{prefix}_enrollee_count": ("member_id", "nunique"),
                 f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
+                f"{prefix}_file_count": ("raw_xml_path", "nunique"),
             }
         )
         .reset_index()
@@ -216,18 +244,24 @@ def summarize_current(states, status_col, prefix):
     )
 
 
-def issuer_month_summary(states, status_col, prefix):
+def issuer_month_summary(df, prefix, only_included=False):
+    work = df.copy()
+
+    if only_included:
+        work = work[work["include_in_business_count"] == True].copy()
+
     return (
-        states.groupby(["issuer", "report_year", "report_month"], dropna=False)
+        work.groupby(["issuer", "report_year", "report_month"], dropna=False)
         .agg(
             **{
-                f"{prefix}_person_count": ("person_key", "nunique"),
+                f"{prefix}_rows": ("member_id", "size"),
                 f"{prefix}_enrollment_count": ("enrollment_key", "nunique"),
                 f"{prefix}_enrollee_count": ("member_id", "nunique"),
                 f"{prefix}_subscriber_count": ("subscriber_id", "nunique"),
-                f"{prefix}_confirm_count": (status_col, lambda x: (x == "CONFIRM").sum()),
-                f"{prefix}_cancel_count": (status_col, lambda x: (x == "CANCEL").sum()),
-                f"{prefix}_term_count": (status_col, lambda x: (x == "TERM").sum()),
+                f"{prefix}_file_count": ("raw_xml_path", "nunique"),
+                f"{prefix}_confirm_count": ("business_status", lambda x: (x == "CONFIRM").sum()),
+                f"{prefix}_cancel_count": ("business_status", lambda x: (x == "CANCEL").sum()),
+                f"{prefix}_term_count": ("business_status", lambda x: (x == "TERM").sum()),
             }
         )
         .reset_index()
@@ -239,10 +273,33 @@ def issuer_month_summary(states, status_col, prefix):
     )
 
 
-def raw_month_summary(events):
+def exclusion_summary(df):
     return (
-        events[events[["year", "month"]].apply(tuple, axis=1).isin(REPORT_MONTHS)]
-        .groupby(["issuer", "year", "month"], dropna=False)
+        df.groupby(["issuer", "report_year", "report_month", "include_in_business_count"], dropna=False)
+        .agg(
+            rows=("member_id", "size"),
+            enrollments=("enrollment_key", "nunique"),
+            enrollees=("member_id", "nunique"),
+            subscribers=("subscriber_id", "nunique"),
+        )
+        .reset_index()
+        .rename(columns={
+            "report_year": "year",
+            "report_month": "month"
+        })
+        .sort_values(["issuer", "year", "month", "include_in_business_count"])
+    )
+
+
+def raw_month_summary(events):
+    report_set = set(REPORT_MONTHS)
+
+    work = events[
+        events[["year", "month"]].apply(lambda r: (r["year"], r["month"]) in report_set, axis=1)
+    ].copy()
+
+    return (
+        work.groupby(["issuer", "year", "month"], dropna=False)
         .agg(
             raw_rows=("member_id", "size"),
             raw_enrollment_count=("enrollment_key", "nunique"),
@@ -255,18 +312,18 @@ def raw_month_summary(events):
     )
 
 
-def compare_raw_vs_lifecycle(raw_summary, lifecycle_summary):
-    comp = pd.merge(
-        raw_summary,
-        lifecycle_summary,
-        how="outer",
-        on=["issuer", "year", "month"]
+def compare_raw_business(raw, business):
+    comp = raw.merge(
+        business,
+        on=["issuer", "year", "month"],
+        how="outer"
     ).fillna(0)
 
-    numeric_cols = [c for c in comp.columns if c.endswith("_count") or c.endswith("_rows")]
-    for col in numeric_cols:
-        comp[col] = comp[col].astype(int)
+    for col in comp.columns:
+        if col.endswith("_count") or col.endswith("_rows"):
+            comp[col] = comp[col].astype(int)
 
+    comp["row_reduction"] = comp["raw_rows"] - comp["business_rows"]
     comp["enrollment_reduction"] = comp["raw_enrollment_count"] - comp["business_enrollment_count"]
     comp["enrollee_reduction"] = comp["raw_enrollee_count"] - comp["business_enrollee_count"]
     comp["subscriber_reduction"] = comp["raw_subscriber_count"] - comp["business_subscriber_count"]
@@ -274,45 +331,15 @@ def compare_raw_vs_lifecycle(raw_summary, lifecycle_summary):
     return comp.sort_values(["issuer", "year", "month"])
 
 
-def lifecycle_quality_checks(events, states):
-    multi_policy_members = (
-        events.groupby(["issuer", "insurance_type", "member_id"], dropna=False)
-        .agg(
-            policy_count=("enrollment_key", "nunique"),
-            event_rows=("member_id", "size"),
-            first_event=("event_date", "min"),
-            last_event=("event_date", "max"),
-        )
-        .reset_index()
-        .query("policy_count > 1")
-        .sort_values(["policy_count", "event_rows"], ascending=False)
-        .head(1000)
-    )
-
-    superseded_candidates = (
-        states.groupby(["issuer", "report_year", "report_month"], dropna=False)
-        .agg(
-            current_persons=("person_key", "nunique"),
-            current_enrollments=("enrollment_key", "nunique"),
-            confirm=("business_status", lambda x: (x == "CONFIRM").sum()),
-            cancel=("business_status", lambda x: (x == "CANCEL").sum()),
-            term=("business_status", lambda x: (x == "TERM").sum()),
-        )
-        .reset_index()
-        .rename(columns={"report_year": "year", "report_month": "month"})
-    )
-
-    return multi_policy_members, superseded_candidates
-
-
 def write_excel(path, sheets):
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        for sheet_name, df in sheets.items():
-            safe = sheet_name[:31]
+        for name, df in sheets.items():
+            sheet = name[:31]
+
             if df is None or df.empty:
-                pd.DataFrame({"message": ["No data"]}).to_excel(writer, sheet_name=safe, index=False)
+                pd.DataFrame({"message": ["No data"]}).to_excel(writer, sheet_name=sheet, index=False)
             else:
-                df.head(1_048_000).to_excel(writer, sheet_name=safe, index=False)
+                df.head(1_048_000).to_excel(writer, sheet_name=sheet, index=False)
 
         for sheet in writer.book.sheetnames:
             ws = writer.book[sheet]
@@ -326,43 +353,43 @@ def write_excel(path, sheets):
 
 def main():
     print("Reading events...")
-    raw = get_events()
+    raw = read_events()
     print(f"Raw events: {len(raw)}")
 
-    print("Cleaning events...")
-    events = clean_events(raw)
+    print("Cleaning...")
+    events = clean(raw)
 
-    print("Building lifecycle states...")
-    states = build_lifecycle_states(events)
-    print(f"Lifecycle states: {len(states)}")
+    print("Building monthly lookback business records...")
+    monthly = build_monthly_lookback(events)
+    print(f"Monthly lookback rows: {len(monthly)}")
 
-    print("Creating summaries...")
+    print("Summarizing...")
     raw_summary = raw_month_summary(events)
+    business_summary = summarize(monthly, "business_status", "business", only_included=True)
+    monthly_all_summary = summarize(monthly, "business_status", "monthly_all", only_included=False)
 
-    lifecycle_latest_status = summarize_current(states, "status", "latest")
-    lifecycle_business_status = summarize_current(states, "business_status", "business")
+    business_issuer_month = issuer_month_summary(monthly, "business", only_included=True)
+    all_issuer_month = issuer_month_summary(monthly, "monthly_all", only_included=False)
 
-    issuer_month_latest = issuer_month_summary(states, "status", "latest")
-    issuer_month_business = issuer_month_summary(states, "business_status", "business")
+    excluded = exclusion_summary(monthly)
 
-    comparison = compare_raw_vs_lifecycle(raw_summary, issuer_month_business)
+    comparison = compare_raw_business(raw_summary, business_issuer_month)
 
-    multi_policy_members, lifecycle_check = lifecycle_quality_checks(events, states)
+    excluded_records = monthly[monthly["include_in_business_count"] == False].copy()
 
     print("Writing Excel...")
     write_excel(
         OUTPUT_EXCEL,
         {
-            "Raw_vs_Lifecycle_Compare": comparison,
-            "Issuer_Month_Business": issuer_month_business,
-            "Issuer_Month_Latest": issuer_month_latest,
-            "Lifecycle_Business_Status": lifecycle_business_status,
-            "Lifecycle_Latest_Status": lifecycle_latest_status,
-            "Lifecycle_Check": lifecycle_check,
-            "Multi_Policy_Members": multi_policy_members,
-            "Lifecycle_Entity_State": states,
+            "Raw_vs_Business_Compare": comparison,
+            "Business_Issuer_Month": business_issuer_month,
+            "All_Current_Month_Records": all_issuer_month,
+            "Business_Status_Summary": business_summary,
+            "All_Status_Summary": monthly_all_summary,
+            "Exclusion_Summary": excluded,
+            "Excluded_Records_Sample": excluded_records.head(5000),
+            "Monthly_Lookback_Sample": monthly.head(20000),
             "Raw_Month_Summary": raw_summary,
-            "Raw_Events_Sample": events.head(100000),
         }
     )
 
