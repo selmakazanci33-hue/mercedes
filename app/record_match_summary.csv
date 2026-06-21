@@ -1,6 +1,0 @@
-join_type,join_keys,match_count,xml_not_in_azure,azure_not_in_xml,status_diff
-primary,issuer+policy_id+member_id+insurance_type+year+month,0,2899,2548,0
-issuer_policy_member_insurance,issuer+policy_id+member_id+insurance_type,0,2735,2442,
-issuer_policy_subscriber_insurance,issuer+policy_id+subscriber_id+insurance_type,0,2182,1971,
-issuer_member_insurance,issuer+member_id+insurance_type,0,2534,2305,
-issuer_subscriber_insurance,issuer+subscriber_id+insurance_type,0,2006,86,
