@@ -1,0 +1,28 @@
+DATA SOURCE AUDIT
+========================================
+generated_at: 2026-06-21T22:20:48+00:00
+
+DATA_SOURCE_MODE=REAL
+XML_SOURCE=source_data
+AZURE_SOURCE=dbo.834_Inbound_test
+SYNTHETIC_DATA_USED=false
+synthetic_data_reason: none
+
+xml_files_read_count: 215
+xml_rows_loaded: 40509
+xml_load_path: source_data_direct
+azure_rows_fetched: 12788
+azure_live_fetch: True
+
+previous_outputs_read: False
+previous_outputs_read_paths: none
+enable_full_discovery: False
+overall_accuracy_from_current_run: True
+
+selected_issuers: 15105
+selected_years: 2025, 2026
+selected_months: 01, 02, 03, 04, 05, 06, 10, 11
+
+relationship_thresholds:
+  RELATIONSHIP_MIN_RECORD_MATCH_RATE=70.0
+  RELATIONSHIP_MIN_STATUS_MATCH_RATE=85.0

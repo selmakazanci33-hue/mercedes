@@ -1,0 +1,29 @@
+FINAL VALIDATION
+========================================
+azure_available: True
+azure_not_in_xml_remaining: 1371
+azure_raw_rows: 12788
+azure_requested: True
+comparable_date_diff_count: 204
+connection: {'runner_name': 'run_final_comparison.py', 'server_present': True, 'database_present': True, 'username_present': True, 'driver': 'ODBC Driver 17 for SQL Server', 'authentication_mode': 'ActiveDirectoryInteractive', 'connection_timeout': 300, 'connection_mode': 'ActiveDirectoryInteractive', 'connected': True}
+cross_field_date_diff_count: 185
+effective_date_match_rate: 99.78
+enable_full_discovery: False
+fast_mode: True
+file_event_month_match_rate: 100.0
+final_comparison_paths: {'comparison_summary': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\comparison_summary.xlsx', 'comparison_details': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\comparison_details.xlsx', 'strategy_scores': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\strategy_scores.xlsx', 'best_strategy': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\best_strategy.xlsx', 'comparison_sqlite': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\comparison.sqlite', 'comparison_dashboard': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\comparison_dashboard.html', 'strategy_dashboard': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\strategy_dashboard.html', 'business_dashboard': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\business_dashboard.html', 'final_result_csv': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\final_result.csv', 'final_result_xlsx': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\final_result.xlsx', 'final_result_html': 'C:\\Users\\SelmaKazanci\\Downloads\\project\\gaaccess-develop8\\834_issuer_etl\\outputs\\comparison\\final_result.html'}
+final_overall_accuracy: 79.31
+final_selected_strategy: C
+final_selected_table: dbo.834_Inbound_test
+issuers_processed: ['15105']
+match_count: 12889
+record_match_rate: 31.82
+relationship_valid: False
+skip_azure: False
+status_match_rate: 99.44
+xml_lifecycle_rows: 244352
+xml_not_in_azure_remaining: 27818
+xml_raw_rows: 40509
+
+VALIDATION CHECKS
+all_passed=True
