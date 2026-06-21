@@ -1,0 +1,3 @@
+comparison_type,join_keys,xml_raw_rows,azure_raw_rows,xml_snapshot_rows,azure_snapshot_rows,match_count,xml_not_in_azure,azure_not_in_xml,status_diff,record_match_rate,status_match_rate,date_exact_match_rate,date_month_match_rate,effective_date_match_rate,relationship_valid,azure_snapshot_coverage_rate,raw_event_match_rate,xml_latest_rows,final_business_match_rate
+lifecycle_snapshot,issuer+policy_id+member_id+insurance_type+year+month,40509.0,12788.0,32956.0,11424.0,10548,22408,876,2,32.01,99.98,99.94,100.0,99.99,False,92.33,38.74,,
+latest_state,issuer+policy_id+member_id+insurance_type,,,,,10258,15701,976,0,39.52,100.0,99.98,100.0,100.0,False,91.31,,25959.0,39.52

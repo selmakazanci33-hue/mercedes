@@ -1,0 +1,114 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'>
+<title>Final Lifecycle Result</title>
+<style>body{font-family:sans-serif;margin:1.5rem}table{border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:4px 8px}h2{margin-top:1.5rem}</style>
+</head><body>
+<h1>Final Lifecycle Result</h1>
+<p><em>XML contains multiple transaction events per member/policy; lifecycle snapshot comparison is the correct business-level comparison.</em></p><h3>A) Raw event comparison (diagnostic)</h3><p>Raw event match rate: 38.74%</p><p>XML raw rows: 40,509 | Azure raw rows: 12,788</p><h3>B) Lifecycle snapshot comparison (primary)</h3><p>Lifecycle snapshot match rate: 32.01%</p><p>Status match rate: 99.98%</p><p>XML lifecycle snapshot rows: 32,956 | Azure lifecycle snapshot rows: 11,424</p><p>XML lifecycle not in Azure: 22,408</p><p>Azure not in XML: 876</p>
+<h2>Summary</h2>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>xml_raw_rows</th>
+      <th>azure_raw_rows</th>
+      <th>xml_lifecycle_snapshot_rows</th>
+      <th>azure_lifecycle_snapshot_rows</th>
+      <th>raw_event_match_rate</th>
+      <th>lifecycle_snapshot_match_rate</th>
+      <th>status_match_rate</th>
+      <th>effective_date_match_rate</th>
+      <th>lifecycle_xml_not_in_azure</th>
+      <th>lifecycle_azure_not_in_xml</th>
+      <th>final_business_match_rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>40509</td>
+      <td>12788</td>
+      <td>32956</td>
+      <td>11424</td>
+      <td>38.74</td>
+      <td>32.01</td>
+      <td>99.98</td>
+      <td>99.99</td>
+      <td>22408</td>
+      <td>876</td>
+      <td>39.52</td>
+    </tr>
+  </tbody>
+</table>
+<h2>Detail sample</h2>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>comparison_type</th>
+      <th>join_keys</th>
+      <th>xml_raw_rows</th>
+      <th>azure_raw_rows</th>
+      <th>xml_snapshot_rows</th>
+      <th>azure_snapshot_rows</th>
+      <th>match_count</th>
+      <th>xml_not_in_azure</th>
+      <th>azure_not_in_xml</th>
+      <th>status_diff</th>
+      <th>record_match_rate</th>
+      <th>status_match_rate</th>
+      <th>date_exact_match_rate</th>
+      <th>date_month_match_rate</th>
+      <th>effective_date_match_rate</th>
+      <th>relationship_valid</th>
+      <th>azure_snapshot_coverage_rate</th>
+      <th>raw_event_match_rate</th>
+      <th>xml_latest_rows</th>
+      <th>final_business_match_rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>lifecycle_snapshot</td>
+      <td>issuer+policy_id+member_id+insurance_type+year+month</td>
+      <td>40509.0</td>
+      <td>12788.0</td>
+      <td>32956.0</td>
+      <td>11424.0</td>
+      <td>10548</td>
+      <td>22408</td>
+      <td>876</td>
+      <td>2</td>
+      <td>32.01</td>
+      <td>99.98</td>
+      <td>99.94</td>
+      <td>100.0</td>
+      <td>99.99</td>
+      <td>False</td>
+      <td>92.33</td>
+      <td>38.74</td>
+      <td>NaN</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <td>latest_state</td>
+      <td>issuer+policy_id+member_id+insurance_type</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>10258</td>
+      <td>15701</td>
+      <td>976</td>
+      <td>0</td>
+      <td>39.52</td>
+      <td>100.00</td>
+      <td>99.98</td>
+      <td>100.0</td>
+      <td>100.00</td>
+      <td>False</td>
+      <td>91.31</td>
+      <td>NaN</td>
+      <td>25959.0</td>
+      <td>39.52</td>
+    </tr>
+  </tbody>
+</table>
+</body></html>
