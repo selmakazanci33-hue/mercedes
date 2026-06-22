@@ -1,0 +1,2 @@
+model_id,model_name,join_key,xml_output_count,azure_output_count,xml_not_in_azure,azure_not_in_xml,match_rate,status_match_rate,effective_date_match_rate
+H,Chandra-like dashboard counts (enrollment/enrollee/subscriber by month/status),issuer+year+month+insurance_type+status,24,20,4,0,83.33,100.0,46.23
