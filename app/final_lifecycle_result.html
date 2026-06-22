@@ -1,0 +1,119 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'>
+<title>Final Lifecycle Result</title>
+<style>body{font-family:sans-serif;margin:1.5rem}table{border-collapse:collapse}
+th,td{border:1px solid #ccc;padding:4px 8px}h2{margin-top:1.5rem}</style>
+</head><body>
+<h1>Final Lifecycle Result</h1>
+<p><em>XML contains multiple transaction events per member/policy; lifecycle snapshot comparison is the correct business-level comparison.</em></p><p><strong>Best month basis selected:</strong> join_file_event_month</p><p><strong>Join key:</strong> issuer+policy_id+member_id+insurance_type+file_event_year_month</p><h3>Month basis match rates</h3><ul><li>Without month: 40.18%</li><li>File/event month: 32.2%</li><li>Benefit effective month: 40.2%</li><li>Member maintenance month: 32.2%</li></ul><p><strong>MONTH_BASIS_DIFF count:</strong> 6,332</p><h3>A) Raw event comparison (diagnostic)</h3><p>Raw event match rate: 38.74%</p><h3>B) Lifecycle snapshot comparison (primary)</h3><p>Lifecycle snapshot match rate: 32.20%</p><p>Status match rate: 99.99%</p><p>XML lifecycle not in Azure (after reclassification): 16,011</p><p>Azure not in XML: 811</p>
+<h2>Summary</h2>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>best_month_basis</th>
+      <th>xml_raw_rows</th>
+      <th>azure_raw_rows</th>
+      <th>xml_lifecycle_snapshot_rows</th>
+      <th>azure_lifecycle_snapshot_rows</th>
+      <th>raw_event_match_rate</th>
+      <th>lifecycle_snapshot_match_rate</th>
+      <th>match_rate_without_month</th>
+      <th>match_rate_benefit_month</th>
+      <th>status_match_rate</th>
+      <th>effective_date_match_rate</th>
+      <th>month_basis_diff_count</th>
+      <th>lifecycle_xml_not_in_azure</th>
+      <th>lifecycle_azure_not_in_xml</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>join_file_event_month</td>
+      <td>40509</td>
+      <td>12788</td>
+      <td>32956</td>
+      <td>11424</td>
+      <td>38.74</td>
+      <td>32.2</td>
+      <td>40.18</td>
+      <td>40.2</td>
+      <td>99.99</td>
+      <td>100.0</td>
+      <td>6332</td>
+      <td>16011</td>
+      <td>811</td>
+    </tr>
+  </tbody>
+</table>
+<h2>Detail sample</h2>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>comparison_type</th>
+      <th>join_key</th>
+      <th>match_count</th>
+      <th>xml_not_in_azure</th>
+      <th>azure_not_in_xml</th>
+      <th>status_diff</th>
+      <th>match_rate</th>
+      <th>status_match_rate</th>
+      <th>effective_date_match_rate</th>
+      <th>xml_snapshot_rows</th>
+      <th>azure_snapshot_rows</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>join_without_month</td>
+      <td>issuer+policy_id+member_id+insurance_type</td>
+      <td>10431</td>
+      <td>15528</td>
+      <td>803</td>
+      <td>89</td>
+      <td>40.18</td>
+      <td>99.15</td>
+      <td>99.96</td>
+      <td>25959</td>
+      <td>11234</td>
+    </tr>
+    <tr>
+      <td>join_file_event_month</td>
+      <td>issuer+policy_id+member_id+insurance_type+file_event_year_month</td>
+      <td>10613</td>
+      <td>22343</td>
+      <td>811</td>
+      <td>1</td>
+      <td>32.20</td>
+      <td>99.99</td>
+      <td>100.00</td>
+      <td>32956</td>
+      <td>11424</td>
+    </tr>
+    <tr>
+      <td>join_benefit_effective_month</td>
+      <td>issuer+policy_id+member_id+insurance_type+benefit_effective_year_month</td>
+      <td>10442</td>
+      <td>15536</td>
+      <td>803</td>
+      <td>86</td>
+      <td>40.20</td>
+      <td>99.18</td>
+      <td>100.00</td>
+      <td>25978</td>
+      <td>11245</td>
+    </tr>
+    <tr>
+      <td>join_member_maint_month</td>
+      <td>issuer+policy_id+member_id+insurance_type+member_maint_year_month</td>
+      <td>10613</td>
+      <td>22343</td>
+      <td>811</td>
+      <td>1</td>
+      <td>32.20</td>
+      <td>99.99</td>
+      <td>100.00</td>
+      <td>32956</td>
+      <td>11424</td>
+    </tr>
+  </tbody>
+</table>
+</body></html>

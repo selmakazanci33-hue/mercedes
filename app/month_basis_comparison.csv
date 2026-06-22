@@ -1,0 +1,5 @@
+comparison_type,join_key,match_count,xml_not_in_azure,azure_not_in_xml,status_diff,match_rate,status_match_rate,effective_date_match_rate,xml_snapshot_rows,azure_snapshot_rows
+join_without_month,issuer+policy_id+member_id+insurance_type,10431,15528,803,89,40.18,99.15,99.96,25959,11234
+join_file_event_month,issuer+policy_id+member_id+insurance_type+file_event_year_month,10613,22343,811,1,32.2,99.99,100.0,32956,11424
+join_benefit_effective_month,issuer+policy_id+member_id+insurance_type+benefit_effective_year_month,10442,15536,803,86,40.2,99.18,100.0,25978,11245
+join_member_maint_month,issuer+policy_id+member_id+insurance_type+member_maint_year_month,10613,22343,811,1,32.2,99.99,100.0,32956,11424
