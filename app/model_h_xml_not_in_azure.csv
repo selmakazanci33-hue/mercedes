@@ -1,0 +1,5 @@
+issuer,year,month,insurance_type,status,xml_enrollment_count,xml_enrollee_count,xml_subscriber_count,azure_enrollment_count,azure_enrollee_count,azure_subscriber_count,difference_reason
+15105,2026,01,HEALTH,TERMINATED,217,1,217,0,0,0,AZURE_HAS_SAME_MONTH_DIFFERENT_STATUS
+15105,2026,06,HEALTH,CANCELLED,23,1,23,0,0,0,AZURE_MISSING_MONTH_PARTITION
+15105,2026,06,HEALTH,ENROLLED,128,1,128,0,0,0,AZURE_MISSING_MONTH_PARTITION
+15105,2026,06,HEALTH,TERMINATED,144,1,144,0,0,0,AZURE_MISSING_MONTH_PARTITION
