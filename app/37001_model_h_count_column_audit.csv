@@ -1,0 +1,7 @@
+source,count_type,candidate_columns,columns_with_data,primary_column,rows_with_id,rows_total,nonempty_rate_pct
+xml,enrollment_count,policy_id;enrollment_id;exchg_assigned_policy_id;health_coverage_policy_no;healthCoveragePolicyID,policy_id;health_coverage_policy_no,policy_id,11995,11995,100.0
+xml,enrollee_count,member_id;enrollee_id;exchg_indiv_identifier;issuer_indiv_identifier;exchg_assigned_enrollee_id,member_id;issuer_indiv_identifier,member_id,11995,11995,100.0
+xml,subscriber_count,subscriber_id;exchg_subscriber_identifier;issuer_subscriber_identifier,subscriber_id;issuer_subscriber_identifier,subscriber_id,11995,11995,100.0
+azure,enrollment_count,policy_id;exchgAssignedPolicyID;exchg_assigned_policy_id;healthCoveragePolicyID;health_coverage_policy_no,,,0,0,0.0
+azure,enrollee_count,member_id;exchgIndivIdentifier;exchg_indiv_identifier,,,0,0,0.0
+azure,subscriber_count,subscriber_id;exchgSubscriberIdentifier;exchg_subscriber_identifier,,,0,0,0.0
