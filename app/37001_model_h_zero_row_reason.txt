@@ -1,0 +1,14 @@
+issuer: 37001
+zero_row_reason: AZURE_ZERO_ROWS_FOR_ISSUER
+
+Azure returned zero rows for issuer/scope; comparison cannot determine business match.
+
+sql_table: dbo.834_Inbound_test
+issuer_column: GAA_HIOS_ID
+date_column: GAA_834_File_Date
+source_data_months: 2025-10, 2025-11, 2025-12, 2026-01, 2026-02, 2026-03, 2026-04, 2026-05, 2026-06
+raw_rows_without_date_filter: 0
+raw_rows_scope_year_only: 0
+raw_rows_with_date_filter: 0
+raw_rows_after_canonical_normalization: 0
+azure_distinct_insurance_types: 
