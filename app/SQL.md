@@ -26,3 +26,87 @@ FROM dbo.Enrollments_TEST;
 
 
 
+
+
+
+
+SELECT COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME='Enrollments_TEST'
+ORDER BY ORDINAL_POSITION;
+
+
+coverage_year
+GAA_Load_Datetime
+household_id
+fpl
+ssap_application_id
+external_application_id
+application_type
+source
+application_status
+Insurance_Type
+enrollment_id
+enrollee_id
+person_type
+relationship_type
+consumer_category
+birth_date
+enrollee_first_name
+enrollee_last_name
+total_indv_responsibility_amt
+gross_premium_amt
+net_premium_amt
+aptc_amt
+csr_amt
+exchange_eligibility_status
+plan_level_combined_bronze
+cms_plan_id
+plan_id
+plan_name
+hios_issuer_id
+insurer_name
+age
+email_address
+phone_number
+rating_area
+county
+zip
+broker_role
+broker_id
+assister_broker_id
+npn
+first_name
+last_name
+business_name
+technology_provider
+enrollment_status_description
+enrollee_status_description
+benefit_effective_date
+benefit_end_date
+enrollment_confirmation_date
+enrollment_create_date
+enrollment_last_update_date
+enrollee_start_date
+enrollee_end_date
+enrollee_create_date
+enrollee_last_update_date
+application_create_date
+application_last_update_date
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
