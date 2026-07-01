@@ -1,112 +1,282 @@
-SELECT TOP 20 *
-FROM dbo.Enrollments_TEST;
+SELECT
+    coverage_year,
+    hios_issuer_id,
+    MONTH(GAA_Load_Datetime) AS load_month,
+    Insurance_Type,
+    enrollment_status_description,
+    enrollee_status_description,
+    COUNT(*) AS row_count,
+    COUNT(DISTINCT enrollment_id) AS enrollment_count,
+    COUNT(DISTINCT enrollee_id) AS enrollee_count
+FROM dbo.Enrollments_TEST
+WHERE coverage_year = 2025
+GROUP BY
+    coverage_year,
+    hios_issuer_id,
+    MONTH(GAA_Load_Datetime),
+    Insurance_Type,
+    enrollment_status_description,
+    enrollee_status_description
+ORDER BY
+    hios_issuer_id,
+    load_month,
+    enrollment_status_description,
+    enrollee_status_description;
 
 
+    2025	13535	6	Dental	Cancelled	Cancelled	935	702	908
+2025	13535	6	Dental	Enrolled	Cancelled	2	2	2
+2025	13535	6	Dental	Enrolled	Enrolled	1060	715	1060
+2025	13535	6	Dental	Enrolled	Terminated	7	5	7
+2025	13535	6	Dental	Pend canceled	Pend canceled	47	31	42
+2025	13535	6	Dental	Pending	Pending	3	3	3
+2025	13535	6	Dental	Terminated	Cancelled	5	5	5
+2025	13535	6	Dental	Terminated	Terminated	592	405	586
+2025	15105	6	Health	Aborted	Aborted	7	6	7
+2025	15105	6	Health	Cancelled	Cancelled	20776	14659	18010
+2025	15105	6	Health	Enrolled	Cancelled	77	59	73
+2025	15105	6	Health	Enrolled	Enrolled	23063	17978	23063
+2025	15105	6	Health	Enrolled	Terminated	133	110	131
+2025	15105	6	Health	Pend	Pend	12	9	12
+2025	15105	6	Health	Pend canceled	Enrolled	13	13	12
+2025	15105	6	Health	Pend canceled	Pend canceled	557	412	487
+2025	15105	6	Health	Terminated	Cancelled	86	64	85
+2025	15105	6	Health	Terminated	Terminated	12097	9401	11387
+2025	37001	6	Dental	Aborted	Aborted	2	2	2
+2025	37001	6	Dental	Cancelled	Cancelled	5867	4345	5331
+2025	37001	6	Dental	Cancelled	Pend canceled	2	1	2
+2025	37001	6	Dental	Cancelled	Pending	3	3	3
+2025	37001	6	Dental	Enrolled	Cancelled	7	7	7
+2025	37001	6	Dental	Enrolled	Enrolled	3138	2307	3138
+2025	37001	6	Dental	Enrolled	Terminated	24	23	24
+2025	37001	6	Dental	Pend	Pend	1	1	1
+2025	37001	6	Dental	Pend canceled	Pend canceled	124	98	110
+2025	37001	6	Dental	Terminated	Cancelled	31	19	31
+2025	37001	6	Dental	Terminated	Terminated	3197	2509	3156
+2025	37301	6	Dental	Cancelled	Cancelled	4593	2930	4161
+2025	37301	6	Dental	Cancelled	Pending	3	3	3
+2025	37301	6	Dental	Enrolled	Cancelled	21	20	21
+2025	37301	6	Dental	Enrolled	Enrolled	4260	2989	4260
+2025	37301	6	Dental	Enrolled	Pending	1	1	1
+2025	37301	6	Dental	Enrolled	Terminated	41	32	41
+2025	37301	6	Dental	Pend	Pend	1	1	1
+2025	37301	6	Dental	Pend canceled	Pend canceled	108	75	104
+2025	37301	6	Dental	Terminated	Cancelled	28	18	28
+2025	37301	6	Dental	Terminated	Pending	4	1	4
+2025	37301	6	Dental	Terminated	Terminated	2673	1858	2646
+2025	43802	6	Health	Aborted	Aborted	4	4	3
+2025	43802	6	Dental	Aborted	Aborted	1	1	1
+2025	43802	6	Health	Cancelled	Cancelled	3661	2354	3195
+2025	43802	6	Dental	Cancelled	Cancelled	6171	4266	5942
+2025	43802	6	Dental	Cancelled	Pend canceled	1	1	1
+2025	43802	6	Dental	Cancelled	Pending	24	15	24
+2025	43802	6	Health	Enrolled	Cancelled	15	13	15
+2025	43802	6	Dental	Enrolled	Cancelled	36	24	36
+2025	43802	6	Dental	Enrolled	Enrolled	8823	5868	8823
+2025	43802	6	Health	Enrolled	Enrolled	5172	3874	5172
+2025	43802	6	Health	Enrolled	Terminated	20	19	20
+2025	43802	6	Dental	Enrolled	Terminated	84	69	84
+2025	43802	6	Dental	Pend	Pend	3	3	3
+2025	43802	6	Health	Pend	Pend	2	1	2
+2025	43802	6	Health	Pend canceled	Pend canceled	358	268	306
+2025	43802	6	Dental	Pend canceled	Pend canceled	559	322	521
+2025	43802	6	Health	Pend canceled	Pending	3	1	3
+2025	43802	6	Health	Pending	Pending	9	3	9
+2025	43802	6	Dental	Pending	Pending	48	28	48
+2025	43802	6	Health	Terminated	Cancelled	30	23	30
+2025	43802	6	Dental	Terminated	Cancelled	46	33	45
+2025	43802	6	Health	Terminated	Terminated	2886	2210	2763
+2025	43802	6	Dental	Terminated	Terminated	5442	3465	5382
+2025	45334	6	Health	Aborted	Aborted	61	53	57
+2025	45334	6	Health	Cancelled	Cancelled	34958	28015	30212
+2025	45334	6	Health	Enrolled	Aborted	1	1	1
+2025	45334	6	Health	Enrolled	Cancelled	106	78	102
+2025	45334	6	Health	Enrolled	Enrolled	63823	52905	63823
+2025	45334	6	Health	Enrolled	Terminated	434	362	430
+2025	45334	6	Health	Pend	Pend	71	55	69
+2025	45334	6	Health	Pend canceled	Pend canceled	3483	2697	3059
+2025	45334	6	Health	Pend canceled	Pending	8	5	8
+2025	45334	6	Health	Pending	Pending	19	14	19
+2025	45334	6	Health	Terminated	Cancelled	233	167	216
+2025	45334	6	Health	Terminated	Terminated	58730	49122	54341
+2025	49046	6	Health	Aborted	Aborted	18	13	18
+2025	49046	6	Dental	Aborted	Aborted	3	2	3
+2025	49046	6	Health	Cancelled	Aborted	1	1	1
+2025	49046	6	Dental	Cancelled	Cancelled	23054	16038	21364
+2025	49046	6	Health	Cancelled	Cancelled	39484	24975	33710
+2025	49046	6	Dental	Cancelled	Pend canceled	1	1	1
+2025	49046	6	Dental	Cancelled	Pending	30	20	30
+2025	49046	6	Health	Enrolled	Aborted	2	2	2
+2025	49046	6	Health	Enrolled	Cancelled	246	206	241
+2025	49046	6	Dental	Enrolled	Cancelled	104	75	103
+2025	49046	6	Dental	Enrolled	Enrolled	21258	14432	21256
+2025	49046	6	Health	Enrolled	Enrolled	63296	44169	63296
+2025	49046	6	Health	Enrolled	Terminated	546	464	543
+2025	49046	6	Dental	Enrolled	Terminated	215	181	213
+2025	49046	6	Health	Pend	Pend	26	19	26
+2025	49046	6	Dental	Pend	Pend	14	9	14
+2025	49046	6	Health	Pend canceled	Pend canceled	2069	1363	1850
+2025	49046	6	Dental	Pend canceled	Pend canceled	1265	862	1169
+2025	49046	6	Health	Pending	Pending	17	9	17
+2025	49046	6	Dental	Pending	Pending	6	6	6
+2025	49046	6	Health	Terminated	Aborted	4	2	4
+2025	49046	6	Dental	Terminated	Cancelled	122	87	118
+2025	49046	6	Health	Terminated	Cancelled	233	182	228
+2025	49046	6	Dental	Terminated	Terminated	14916	10621	14753
+2025	49046	6	Health	Terminated	Terminated	32745	24078	30526
+2025	58081	6	Health	Aborted	Aborted	102	85	99
+2025	58081	6	Health	Cancelled	Aborted	1	1	1
+2025	58081	6	Health	Cancelled	Cancelled	210011	141401	174523
+2025	58081	6	Health	Enrolled	Aborted	9	6	7
+2025	58081	6	Health	Enrolled	Cancelled	970	748	941
+2025	58081	6	Health	Enrolled	Enrolled	210311	150551	210311
+2025	58081	6	Health	Enrolled	Terminated	2824	2181	2722
+2025	58081	6	Health	Pend	Pend	43	32	43
+2025	58081	6	Health	Pend canceled	Pend canceled	3885	3101	3263
+2025	58081	6	Health	Pend canceled	Pending	1	1	1
+2025	58081	6	Health	Pending	Pending	30	25	30
+2025	58081	6	Health	Pending	Terminated	1	1	1
+2025	58081	6	Health	Terminated	Aborted	6	4	6
+2025	58081	6	Health	Terminated	Cancelled	1053	776	1019
+2025	58081	6	Health	Terminated	Terminated	202166	162159	188130
+2025	60224	6	Health	Aborted	Aborted	5	5	5
+2025	60224	6	Health	Cancelled	Cancelled	13384	8871	11863
+2025	60224	6	Health	Enrolled	Cancelled	63	47	61
+2025	60224	6	Health	Enrolled	Enrolled	25660	20748	25660
+2025	60224	6	Health	Enrolled	Terminated	126	115	125
+2025	60224	6	Health	Pend	Pend	10	8	10
+2025	60224	6	Health	Pend canceled	Pend canceled	541	390	489
+2025	60224	6	Health	Pending	Pending	16	13	16
+2025	60224	6	Health	Terminated	Cancelled	68	61	68
+2025	60224	6	Health	Terminated	Terminated	13096	11012	12848
+2025	64357	6	Dental	Cancelled	Cancelled	1035	676	914
+2025	64357	6	Dental	Cancelled	Pending	2	2	2
+2025	64357	6	Dental	Enrolled	Enrolled	874	604	874
+2025	64357	6	Dental	Enrolled	Terminated	3	3	3
+2025	64357	6	Dental	Pend canceled	Pend canceled	21	11	21
+2025	64357	6	Dental	Pending	Pending	19	12	19
+2025	64357	6	Dental	Terminated	Cancelled	1	1	1
+2025	64357	6	Dental	Terminated	Terminated	500	354	498
+2025	68806	6	Dental	Cancelled	Cancelled	9728	6132	8786
+2025	68806	6	Dental	Cancelled	Pending	11	7	11
+2025	68806	6	Dental	Enrolled	Cancelled	52	42	52
+2025	68806	6	Dental	Enrolled	Enrolled	9529	6498	9529
+2025	68806	6	Dental	Enrolled	Terminated	136	110	136
+2025	68806	6	Dental	Pend	Pend	5	3	5
+2025	68806	6	Dental	Pend canceled	Enrolled	1	1	1
+2025	68806	6	Dental	Pend canceled	Pend canceled	339	183	318
+2025	68806	6	Dental	Pend canceled	Pending	2	1	2
+2025	68806	6	Dental	Pending	Pending	172	108	172
+2025	68806	6	Dental	Pending	Terminated	1	1	1
+2025	68806	6	Dental	Terminated	Cancelled	88	50	73
+2025	68806	6	Dental	Terminated	Terminated	5044	3273	5002
+2025	70893	6	Health	Aborted	Aborted	265	194	246
+2025	70893	6	Health	Cancelled	Aborted	3	2	3
+2025	70893	6	Health	Cancelled	Cancelled	274407	191516	222020
+2025	70893	6	Health	Cancelled	Pend canceled	1	1	1
+2025	70893	6	Health	Enrolled	Aborted	7	7	7
+2025	70893	6	Health	Enrolled	Cancelled	2153	1682	2102
+2025	70893	6	Health	Enrolled	Enrolled	661383	525519	661377
+2025	70893	6	Health	Enrolled	Pending	17	12	17
+2025	70893	6	Health	Enrolled	Terminated	6163	4890	6037
+2025	70893	6	Health	Pend	Pend	130	107	130
+2025	70893	6	Health	Pend canceled	Enrolled	142	114	138
+2025	70893	6	Health	Pend canceled	Pend canceled	9372	7286	8061
+2025	70893	6	Health	Pend canceled	Pending	8	7	8
+2025	70893	6	Health	Pending	Cancelled	6	5	6
+2025	70893	6	Health	Pending	Pending	245	161	245
+2025	70893	6	Health	Pending	Terminated	5	1	5
+2025	70893	6	Health	Terminated	Aborted	11	7	10
+2025	70893	6	Health	Terminated	Cancelled	1872	1387	1794
+2025	70893	6	Health	Terminated	Terminated	271072	207289	232695
+2025	82824	6	Health	Aborted	Aborted	19	13	18
+2025	82824	6	Health	Cancelled	Cancelled	66748	46219	57636
+2025	82824	6	Health	Enrolled	Cancelled	161	131	158
+2025	82824	6	Health	Enrolled	Enrolled	58724	44702	58724
+2025	82824	6	Health	Enrolled	Terminated	437	370	436
+2025	82824	6	Health	Pend	Pend	27	14	27
+2025	82824	6	Health	Pend canceled	Pend canceled	1248	837	1063
+2025	82824	6	Health	Pend canceled	Pending	1	1	1
+2025	82824	6	Health	Pending	Pending	4	3	4
+2025	82824	6	Health	Terminated	Cancelled	271	208	269
+2025	82824	6	Health	Terminated	Terminated	61968	50827	60427
+2025	83502	6	Dental	Cancelled	Cancelled	1274	935	1195
+2025	83502	6	Dental	Enrolled	Cancelled	2	2	2
+2025	83502	6	Dental	Enrolled	Enrolled	1185	868	1185
+2025	83502	6	Dental	Enrolled	Terminated	6	6	6
+2025	83502	6	Dental	Pend canceled	Pend canceled	33	23	32
+2025	83502	6	Dental	Terminated	Cancelled	13	7	10
+2025	83502	6	Dental	Terminated	Terminated	792	601	784
+2025	83761	6	Health	Aborted	Aborted	12	8	12
+2025	83761	6	Health	Cancelled	Cancelled	30449	18703	25518
+2025	83761	6	Health	Enrolled	Cancelled	269	222	264
+2025	83761	6	Health	Enrolled	Enrolled	55229	38043	55229
+2025	83761	6	Health	Enrolled	Terminated	572	494	559
+2025	83761	6	Health	Pend	Pend	16	12	16
+2025	83761	6	Health	Pend canceled	Pend canceled	1395	898	1227
+2025	83761	6	Health	Pending	Pending	43	29	43
+2025	83761	6	Health	Terminated	Cancelled	180	138	178
+2025	83761	6	Health	Terminated	Terminated	20119	14522	18965
+2025	86637	6	Dental	Aborted	Aborted	1	1	1
+2025	86637	6	Dental	Cancelled	Cancelled	6536	4170	6070
+2025	86637	6	Dental	Cancelled	Pending	5	4	5
+2025	86637	6	Dental	Enrolled	Cancelled	38	34	38
+2025	86637	6	Dental	Enrolled	Enrolled	9005	5989	9005
+2025	86637	6	Dental	Enrolled	Terminated	76	62	76
+2025	86637	6	Dental	Pend	Pend	5	3	5
+2025	86637	6	Dental	Pend canceled	Enrolled	4	1	4
+2025	86637	6	Dental	Pend canceled	Pend canceled	296	195	280
+2025	86637	6	Dental	Pending	Pending	64	43	64
+2025	86637	6	Dental	Terminated	Cancelled	40	32	38
+2025	86637	6	Dental	Terminated	Terminated	5580	3829	5503
+2025	89942	6	Health	Aborted	Aborted	7	4	7
+2025	89942	6	Health	Cancelled	Cancelled	41862	26945	33884
+2025	89942	6	Health	Cancelled	Pend canceled	3	1	3
+2025	89942	6	Health	Enrolled	Aborted	1	1	1
+2025	89942	6	Health	Enrolled	Cancelled	315	262	312
+2025	89942	6	Health	Enrolled	Enrolled	69334	47742	69334
+2025	89942	6	Health	Enrolled	Terminated	719	582	707
+2025	89942	6	Health	Pend	Pend	26	23	26
+2025	89942	6	Health	Pend canceled	Enrolled	9	9	8
+2025	89942	6	Health	Pend canceled	Pend canceled	1511	1090	1315
+2025	89942	6	Health	Pend canceled	Pending	2	2	2
+2025	89942	6	Health	Pending	Pending	73	51	73
+2025	89942	6	Health	Terminated	Aborted	2	2	2
+2025	89942	6	Health	Terminated	Cancelled	263	191	245
+2025	89942	6	Health	Terminated	Terminated	27559	19844	25187
 
-2025	2026-06-01	1238390	NULL	2630846	NULL	OE	EDE	EN	Health	23770926	1002313913	Subscriber	Self	NULL	1982-06-04	Natasha	Harris	481.92	481.92	481.92	0.00	NULL	QHP	GOLD	70893GA001007101	404	Everyday Gold	70893	Ambetter from Peach State Health Plan	42	nh0851021@gmail.com	4787143713	12	Bibb	31210	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-01-12	2025-01-01	2025-12-31	2024-12-11	2025-01-12	2024-12-11	2025-10-04
-2025	2026-06-01	1238392	NULL	2630865	NULL	OE	EDE	EN	Health	24239221	1002313927	Subscriber	Self	NULL	1968-11-07	Scott	Wollam	773.73	1547.46	1547.46	0.00	NULL	QHP	BRONZE/EXPANDEDBRONZE	83761GA004038201	197	SoloCare Bronze PPO HDHP Chiro 8050 40382-01	83761	Alliant Health Plans, Inc.	56	scottwollam@gmail.com	2298866935	1	Lee	31763	AGENT	2359	2359	20815581	CHRISTOPHER	COLEY	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-08	2024-12-12	2025-11-25	2025-01-01	2025-12-31	2024-12-12	2025-11-25	2024-12-11	2025-10-04
-2025	2026-06-01	1238392	NULL	2630865	NULL	OE	EDE	EN	Health	24239221	1002313937	Enrollee	Spouse	NULL	1968-01-11	Nancy	Wollam	773.73	1547.46	1547.46	0.00	NULL	QHP	BRONZE/EXPANDEDBRONZE	83761GA004038201	197	SoloCare Bronze PPO HDHP Chiro 8050 40382-01	83761	Alliant Health Plans, Inc.	56	scottwollam@gmail.com	2298866935	1	Lee	31763	AGENT	2359	2359	20815581	CHRISTOPHER	COLEY	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-08	2024-12-12	2025-11-25	2025-01-01	2025-12-31	2024-12-12	2025-11-25	2024-12-11	2025-10-04
-2025	2026-06-01	1238396	NULL	2630883	NULL	OE	EDE	EN	Health	23682899	1002313942	Subscriber	Self	NULL	1973-09-16	LAUREN	SHEFFIELD	775.47	775.47	775.47	0.00	NULL	QHP	BRONZE/EXPANDEDBRONZE	70893GA001006401	389	Everyday Bronze	70893	Ambetter from Peach State Health Plan	51	ldubosheff@gmail.com	4043167361	3	Fulton	30328	AGENT	552169	552169	8782031	LISA GUNDLACH MRS	HOWELL	HealthSherpa	HealthSherpa	Terminated	Terminated	2025-01-01	2025-02-28	2025-01-12	2024-12-11	2025-02-22	2025-01-01	2025-02-28	2024-12-11	2025-02-22	2024-12-11	2024-12-11
-2025	2026-06-01	1238411	NULL	2630937	NULL	OE	EDE	EN	Health	23734928	1002313984	Subscriber	Self	NULL	1987-01-13	Gonzalo	Perez Aljure	512.73	512.73	512.73	0.00	NULL	QHP	GOLD	70893GA001007301	407	Clear Gold	70893	Ambetter from Peach State Health Plan	37	gperez0113@gmail.com	9546477663	14	Bryan	31324	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-11	2024-12-11	2025-01-11	2025-01-01	2025-12-31	2024-12-11	2025-01-11	2024-12-11	2025-10-04
-2025	2026-06-01	1238429	NULL	2631009	NULL	OE	EDE	EN	Health	23710928	1002314036	Subscriber	Self	NULL	1971-06-21	Adwanna	Tanner	764.09	764.09	764.09	0.00	NULL	QHP	GOLD	70893GA001002001	383	Complete Gold	70893	Ambetter from Peach State Health Plan	53	adwanna.tanner@wesleyglen.org	4782837245	12	Houston	31088	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-12-23	2025-01-01	2025-12-31	2024-12-11	2025-12-23	2024-12-11	2025-10-04
-2025	2026-06-01	1238431	NULL	2631645	NULL	OE	ON	EN	Health	23732935	1002314505	Subscriber	Self	NULL	1967-01-24	Ryan	Jones	1435.27	1435.27	1435.27	NULL	NULL	QHP	GOLD	82824GA011001901	1099	Gold S: Aetna network + $0 MinuteClinic + $0 CVS Health Virtual Primary Care	82824	Aetna Health Inc. (a GA corp.)	57	rljonesandassociates@gmail.com	6785496648	3	Paulding	30157	AGENT	553616	553616	14882837	ROBERT P	BARBATI	NULL	NULL	Enrolled	Enrolled	2025-01-01	2025-12-31	2024-12-30	2024-12-11	2024-12-30	2025-01-01	2025-12-31	2024-12-11	2024-12-30	2024-12-11	2025-10-04
-2025	2026-06-01	1238432	NULL	2631017	NULL	OE	EDE	ER	Health	23775928	1002314049	Subscriber	Self	NULL	1987-01-27	Michael	Johnson	594.88	594.88	594.88	0.00	NULL	QHP	GOLD	70893GA003007801	467	Standard Gold + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	37	NULL	4044069030	3	Fulton	30349	AGENT	547552	547552	13568432	ROBERT F	HUFFAKER	HealthSherpa	HealthSherpa	Cancelled	Cancelled	2025-01-01	2025-01-01	NULL	2024-12-11	2025-09-26	2025-01-01	2025-01-01	2024-12-11	2025-09-26	2024-12-11	2025-09-26
-2025	2026-06-01	1238441	NULL	2631044	NULL	OE	EDE	EN	Health	23748927	1002314072	Subscriber	Self	NULL	1993-09-07	Kendrick	Clark	619.57	619.57	619.57	0.00	NULL	QHP	SILVER	70893GA003007001	443	Focused Silver + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	31	kendrick.c.clark@gmail.com	4702275812	3	Fulton	30350	AGENT	547552	547552	13568432	ROBERT F	HUFFAKER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-13	2024-12-11	2025-01-13	2025-01-01	2025-12-31	2024-12-11	2025-01-13	2024-12-11	2025-10-04
-2025	2026-06-01	1238448	NULL	4005633	NULL	SEP	ON	EN	Health	23718930	1002314118	Enrollee	Child	NULL	2021-02-16	Amelia	Perez	361.44	1300.24	1300.24	NULL	NULL	QHP	GOLD	70893GA001007401	410	Elite Gold	70893	Ambetter from Peach State Health Plan	3	krystal.santiago@aent.com	9544715303	14	Bryan	31324	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-03-26	2025-01-01	2025-12-31	2024-12-11	2025-03-26	2025-03-26	2025-10-04
-2025	2026-06-01	1238448	NULL	4005633	NULL	SEP	ON	EN	Health	23718930	1002314104	Subscriber	Self	NULL	1989-06-08	Krystal	Santiago	577.36	1300.24	1300.24	NULL	NULL	QHP	GOLD	70893GA001007401	410	Elite Gold	70893	Ambetter from Peach State Health Plan	35	krystal.santiago@aent.com	9544715303	14	Bryan	31324	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-03-26	2025-01-01	2025-12-31	2024-12-11	2025-03-26	2025-03-26	2025-10-04
-2025	2026-06-01	1238448	NULL	4005633	NULL	SEP	ON	EN	Health	23718930	1003944012	Enrollee	Child	NULL	2025-03-19	Penelope	Perez	361.44	1300.24	1300.24	NULL	NULL	QHP	GOLD	70893GA001007401	410	Elite Gold	70893	Ambetter from Peach State Health Plan	0	krystal.santiago@aent.com	9544715303	14	Bryan	31324	AGENT	5090	5090	17414586	JACK	HOOPER	HealthSherpa	HealthSherpa	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-03-26	2025-03-19	2025-12-31	2025-03-26	2025-03-26	2025-03-26	2025-10-04
-2025	2026-06-01	1238449	NULL	2631095	NULL	OE	EDE	EN	Health	23707931	1002314108	Subscriber	Self	NULL	1982-08-10	Morgan	Lueck	441.83	441.83	441.83	0.00	NULL	QHP	BRONZE/EXPANDEDBRONZE	83761GA004039301	200	SoloCare Standard Exp Bronze PPO Chiro 40393-01	83761	Alliant Health Plans, Inc.	42	morganlueck@gmail.com	6152024016	5	Richmond	30904	AGENT	4167	4167	17984100	DONALD	WILKINS	HealthSherpa	HealthSherpa	Terminated	Terminated	2025-01-01	2025-02-28	2025-01-08	2024-12-11	2025-03-09	2025-01-01	2025-02-28	2024-12-11	2025-03-10	2024-12-11	2024-12-11
-2025	2026-06-01	1238452	NULL	4282803	NULL	SEP	ON	EN	Health	23753933	1002314119	Subscriber	Self	NULL	1960-05-23	Karen	Danielson	1038.02	1977.09	1977.09	0.00	NULL	QHP	SILVER	70893GA003001701	425	Complete Silver + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	64	karendanielson523@gmail.com	4043179846	13	Gilmer	30513	AGENT	550137	550137	19222922	CHANCE	MADDEAUX	Via Benefits	HealthSherpa	Terminated	Terminated	2025-01-01	2025-04-30	2025-01-12	2024-12-11	2025-04-23	2025-01-01	2025-04-30	2024-12-11	2025-04-23	2025-04-23	2025-04-24
-2025	2026-06-01	1238452	NULL	4282803	NULL	SEP	ON	EN	Health	51381516	1002314123	Subscriber	Spouse	NULL	1964-08-26	Jay	Danielson	939.07	939.07	939.07	NULL	NULL	QHP	SILVER	70893GA003001701	425	Complete Silver + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	60	karendanielson523@gmail.com	4043179846	13	Gilmer	30513	AGENT	550137	550137	19222922	CHANCE	MADDEAUX	Via Benefits	HealthSherpa	Cancelled	Cancelled	2025-06-01	2025-06-01	NULL	2025-04-08	2025-04-08	2025-06-01	2025-06-01	2025-04-08	2025-04-08	2025-04-23	2025-04-24
-2025	2026-06-01	1238452	NULL	4282803	NULL	SEP	ON	EN	Health	23753933	1002314123	Enrollee	Spouse	NULL	1964-08-26	Jay	Danielson	939.07	1977.09	1977.09	0.00	NULL	QHP	SILVER	70893GA003001701	425	Complete Silver + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	60	karendanielson523@gmail.com	4043179846	13	Gilmer	30513	AGENT	550137	550137	19222922	CHANCE	MADDEAUX	Via Benefits	HealthSherpa	Terminated	Terminated	2025-01-01	2025-04-30	2025-01-12	2024-12-11	2025-04-23	2025-01-01	2025-04-30	2024-12-11	2025-04-23	2025-04-23	2025-04-24
-2025	2026-06-01	1238452	NULL	4282803	NULL	SEP	ON	EN	Health	54681747	1002314123	Subscriber	Spouse	NULL	1964-08-26	Jay	Danielson	1083.12	1083.12	1083.12	NULL	NULL	QHP	GOLD	70893GA003007501	455	Elite Gold + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	60	karendanielson523@gmail.com	4043179846	13	Gilmer	30513	AGENT	550137	550137	19222922	CHANCE	MADDEAUX	Via Benefits	HealthSherpa	Terminated	Terminated	2025-05-01	2025-05-31	2025-04-26	2025-04-24	2025-07-04	2025-05-01	2025-05-31	2025-04-24	2025-07-04	2025-04-23	2025-04-24
-2025	2026-06-01	1238458	NULL	2631138	NULL	OE	EDE	EN	Health	23792925	1002314128	Subscriber	Self	NULL	2001-05-01	Haley	Knight	445.56	929.87	929.87	0.00	NULL	QHP	GOLD	70893GA001007401	410	Elite Gold	70893	Ambetter from Peach State Health Plan	23	haleyeubanks21@gmail.com	6789720276	8	Upson	31097	AGENT	553276	553276	1342923	CAREY S	GRUENBAUM	NULL	NULL	Enrolled	Enrolled	2025-01-01	2025-12-31	2025-01-12	2024-12-11	2025-01-12	2025-01-01	2025-12-31	2024-12-11	2025-01-12	2024-12-11	2025-10-04
-2025	2026-06-01	1238505	NULL	2631345	NULL	OE	EDE	ER	Health	23757927	1002314270	Subscriber	Self	NULL	1982-12-21	Michael	Sloan	643.91	643.91	643.91	0.00	NULL	QHP	GOLD	70893GA003007501	455	Elite Gold + Vision + Adult Dental	70893	Ambetter from Peach State Health Plan	42	NULL	3868462511	14	Chatham	31410	AGENT	547552	547552	13568432	ROBERT F	HUFFAKER	HealthSherpa	HealthSherpa	Cancelled	Cancelled	2025-01-01	2025-01-01	NULL	2024-12-11	2024-12-19	2025-01-01	2025-01-01	2024-12-11	2024-12-19	2024-12-11	2024-12-19
-2025	2026-06-01	1238559	NULL	2631562	NULL	OE	EDE	EN	Health	23730936	1002314447	Subscriber	Self	NULL	1960-08-08	William	Moreland	1265.67	1265.67	1265.67	0.00	NULL	QHP	BRONZE/EXPANDEDBRONZE	49046GA070000501	1915	Anthem Bronze Pathway X Guided Access 7450 for HSA	49046	Anthem Blue Cross and Blue Shield	64	NULL	7706280928	3	Fayette	30214	AGENT	554961	554961	6438720	WILLIAM H II	CASON	HealthSherpa	HealthSherpa	Terminated	Terminated	2025-01-01	2025-02-28	2024-12-21	2024-12-11	2025-10-29	2025-01-01	2025-02-28	2024-12-11	2025-10-29	2024-12-11	2025-09-15
+================================================================
 
-
-
-
-
-
-
-SELECT COLUMN_NAME
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_NAME='Enrollments_TEST'
-ORDER BY ORDINAL_POSITION;
-
-
-coverage_year
-GAA_Load_Datetime
-household_id
-fpl
-ssap_application_id
-external_application_id
-application_type
-source
-application_status
-Insurance_Type
-enrollment_id
-enrollee_id
-person_type
-relationship_type
-consumer_category
-birth_date
-enrollee_first_name
-enrollee_last_name
-total_indv_responsibility_amt
-gross_premium_amt
-net_premium_amt
-aptc_amt
-csr_amt
-exchange_eligibility_status
-plan_level_combined_bronze
-cms_plan_id
-plan_id
-plan_name
-hios_issuer_id
-insurer_name
-age
-email_address
-phone_number
-rating_area
-county
-zip
-broker_role
-broker_id
-assister_broker_id
-npn
-first_name
-last_name
-business_name
-technology_provider
-enrollment_status_description
-enrollee_status_description
-benefit_effective_date
-benefit_end_date
-enrollment_confirmation_date
-enrollment_create_date
-enrollment_last_update_date
-enrollee_start_date
-enrollee_end_date
-enrollee_create_date
-enrollee_last_update_date
-application_create_date
-application_last_update_date
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+SELECT
+    coverage_year,
+    hios_issuer_id,
+    MONTH(GAA_Load_Datetime) AS load_month,
+    COUNT(*) AS row_count,
+    COUNT(DISTINCT enrollment_id) AS enrollment_count,
+    COUNT(DISTINCT enrollee_id) AS enrollee_count
+FROM dbo.Enrollments_TEST
+WHERE coverage_year = 2025
+GROUP BY
+    coverage_year,
+    hios_issuer_id,
+    MONTH(GAA_Load_Datetime)
+ORDER BY
+    hios_issuer_id,
+    load_month;
+2025	13535	6	2651	1856	2551
+2025	15105	6	56821	42478	47249
+2025	37001	6	12396	9263	10956
+2025	37301	6	11733	7853	10413
+2025	43802	6	33398	22668	30209
+2025	45334	6	161927	132861	137206
+2025	49046	6	199675	136597	156241
+2025	58081	6	631413	457354	476571
+2025	60224	6	52969	41047	47357
+2025	64357	6	2455	1657	2230
+2025	68806	6	25108	16198	22399
+2025	70893	6	1227262	932187	914980
+2025	82824	6	189608	142615	158404
+2025	83502	6	3305	2427	2998
+2025	83761	6	108284	72215	83485
+2025	86637	6	21650	14231	19439
+2025	89942	6	141686	95709	107560
