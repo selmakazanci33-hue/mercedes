@@ -121,3 +121,170 @@ test_834_in	exchgAssignedPolicyID
 test_834_in	exchgIndivIdentifier
 test_834_in	memberMaintEffectiveDate
 test_834_in	memberSSN
+
+
+
+SELECT
+    t.name,
+    SUM(p.rows) rows
+FROM sys.tables t
+JOIN sys.partitions p
+ON t.object_id=p.object_id
+WHERE p.index_id IN (0,1)
+GROUP BY
+t.name
+HAVING
+SUM(p.rows)>100000
+ORDER BY
+rows DESC;
+
+
+monthly_discrepancy_PY2025	43448157
+monthly_discrepancy	31896225
+Enrollee_Premium	21846015
+CarrierInvoice_test	19963207
+Enrollment_Premium	16241251
+CarrierInvoice	15451966
+monthly_discrepancy_PY2026	8907002
+DMIDetails	8906727
+Demographics_Premium	5353701
+Enrollments_TEST	5052309
+Enrollments_PY2526_04302026	5008921
+Enrollments_PY2526_03312026	4965233
+Enrollments_PY2526_DEC31	4842711
+Enrollments_PY2526_DEC22	4802846
+Enrollments_PY2526_NOV30	4445128
+Enrollments_PY2526_NOV21	4364666
+Enrollments_PY2526_01312026	4318683
+Enrollments_PY2526_02272026	4269140
+Enrollments_PY2526_FEB10	4244176
+Enrollments_PY2526_DEC17	3999285
+PY2025_Applicants	3875430
+PY2026_Applicants	2750647
+PY2026Applicants_with_tobacco_usage	2706022
+FPL_PY2025_PY2026	2664397
+HH_SSAP_AT2026	2324609
+hh_demographics	2173453
+PY2025-Enrollments_All	2129237
+AT_external_applications	2100369
+PY2026-Enrollments_All	1821858
+PY2024_Applicants	1725272
+GI_Inbound	1592078
+PY2025_DUPSSN	1430975
+FPL_Health_ALL	1304266
+Enrollments_PY2026	1303299
+GW_Outbound	1290954
+PY2026_DUPSSN	1257656
+CMSFILE_TXT_TEST1	1203496
+arpa_household_premium	1125369
+concurrent_ALL	1066865
+Enrollments_Agent	1040961
+arpa_household_premium_new	1029776
+arpa_household_fpl_with_income_new2	1019245
+arpa_household_fpl_with_income	1013269
+arpa_household_fpl	1012453
+hh_demographics_subscribers_PY2025	949070
+Reinsurance_APR_PY2026	874627
+concurrent_ALL_NEW	814254
+hh_demographics_subscribers_PY2026	674238
+CMSFILE_202408_02	603507
+CMSFILE_202408	599989
+arpa_household_fpl_with_income_new	481451
+GI_Inbound_test	461213
+hh_demographics_enrollees_PY2025	290318
+GW_Outbound_test	278378
+GI_Outbound	274828
+hh_demographics_enrollees_PY2026	259827
+GW_Inbound	251019
+agent_sircon_test	202653
+agent_sircon_test_pp	202653
+PY2025_DUPDOB	187985
+monthly_discrepancy_test	130216
+PY2026_DUPDOB	114658
+
+
+
+
+SELECT
+TABLE_SCHEMA,
+TABLE_NAME,
+COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE
+COLUMN_NAME LIKE '%memberMaint%'
+OR COLUMN_NAME LIKE '%policy%'
+OR COLUMN_NAME LIKE '%HIOS%'
+OR COLUMN_NAME LIKE '%exchg%'
+OR COLUMN_NAME LIKE '%834%'
+ORDER BY
+TABLE_NAME;
+
+
+dbo	834_Inbound_header_test	GAA_834_File_Date
+dbo	834_Inbound_header_test	GAA_834_File_Name
+dbo	834_Inbound_header_test	GAA_HIOS_ID
+dbo	834_Inbound_test	exchgAssignedPolicyID
+dbo	834_Inbound_test	exchgIndivIdentifier
+dbo	834_Inbound_test	exchgSubscriberIdentifier
+dbo	834_Inbound_test	GAA_834_File_Date
+dbo	834_Inbound_test	GAA_834_File_Name
+dbo	834_Inbound_test	GAA_HIOS_ID
+dbo	834_Inbound_test	healthCoveragePolicyID
+dbo	834_Inbound_test	memberMaintEffectiveDate
+dbo	834_Inbound_test	previousExchgAssignedPolicyID
+dbo	CarrierInvoice	exchg_indiv_identifier
+dbo	CarrierInvoice	hios_issuer_id
+dbo	CarrierInvoice_All_test	exchg_indiv_identifier
+dbo	CarrierInvoice_All_test	hios_issuer_id
+dbo	CarrierInvoice_test	exchg_indiv_identifier
+dbo	CarrierInvoice_test	hios_issuer_id
+dbo	CMSFILE_202408	Exchange_Assigned_Policy_ID
+dbo	CMSFILE_202408	Issuer_Assigned_Policy_ID
+dbo	CMSFILE_202408	Policy_Total_Premium_Amount
+dbo	CMSFILE_202408_02	Exchange_Assigned_Policy_ID
+dbo	CMSFILE_202408_02	Issuer_Assigned_Policy_ID
+dbo	CMSFILE_202408_02	Policy_Total_Premium_Amount
+dbo	CMSFILE_TXT_TEST1	Exchange_Assigned_Policy_ID
+dbo	CMSFILE_TXT_TEST1	Issuer_Assigned_Policy_ID
+dbo	CMSFILE_TXT_TEST1	Policy_Total_Premium_Amount
+dbo	Consolidated_Full_list	hios_issuer_id
+dbo	Enrollments_AETNA	hios_issuer_id
+dbo	Enrollments_PY2025	hios_issuer_id
+dbo	Enrollments_PY2026	hios_issuer_id
+dbo	Enrollments_PY2526_01312026	hios_issuer_id
+dbo	Enrollments_PY2526_02272026	hios_issuer_id
+dbo	Enrollments_PY2526_03312026	hios_issuer_id
+dbo	Enrollments_PY2526_04302026	hios_issuer_id
+dbo	Enrollments_PY2526_05312026	hios_issuer_id
+dbo	Enrollments_PY2526_DEC17	hios_issuer_id
+dbo	Enrollments_PY2526_DEC22	hios_issuer_id
+dbo	Enrollments_PY2526_DEC31	hios_issuer_id
+dbo	Enrollments_PY2526_FEB10	hios_issuer_id
+dbo	Enrollments_PY2526_NOV21	hios_issuer_id
+dbo	Enrollments_PY2526_NOV30	hios_issuer_id
+dbo	Enrollments_TEST	hios_issuer_id
+dbo	FPL_Dental_ALL	hios_issuer_id
+dbo	FPL_Health_ALL	hios_issuer_id
+dbo	FPL_PY2025_PY2026	hios_issuer_id
+dbo	Jan2025_Invoice	Exchange_Assigned_Policy_ID
+dbo	Jan2025_Invoice	Issuer_Assigned_Policy_ID
+dbo	Jan2025_Invoice	Policy_Total_Premium_Amount
+dbo	monthly_discrepancy	Exchange_Assigned_Policy_ID
+dbo	monthly_discrepancy	GAA_HIOS_ID
+dbo	monthly_discrepancy_priority_test	GAA_HIOS_ID
+dbo	monthly_discrepancy_priority_test1	GAA_HIOS_ID
+dbo	monthly_discrepancy_PY2025	Exchange_Assigned_Policy_ID
+dbo	monthly_discrepancy_PY2025	GAA_HIOS_ID
+dbo	monthly_discrepancy_PY2026	Exchange_Assigned_Policy_ID
+dbo	monthly_discrepancy_PY2026	GAA_HIOS_ID
+dbo	monthly_discrepancy_test	Exchange_Assigned_Policy_ID
+dbo	monthly_discrepancy_test	GAA_HIOS_ID
+dbo	PY2025_DUPDOB	hios_issuer_id
+dbo	PY2025_DUPSSN	hios_issuer_id
+dbo	PY2026_DUPDOB	hios_issuer_id
+dbo	PY2026_DUPSSN	hios_issuer_id
+dbo	Reinsurance_APR_PY2026	exchg_indiv_identifier
+dbo	test_834_in	exchgAssignedPolicyID
+dbo	test_834_in	exchgIndivIdentifier
+dbo	test_834_in	exchgSubscriberIdentifier
+dbo	test_834_in	memberMaintEffectiveDate
